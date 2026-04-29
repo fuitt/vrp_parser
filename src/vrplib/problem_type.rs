@@ -1,9 +1,6 @@
 use std::convert::TryFrom;
 
-#[derive(Debug, PartialEq)]
-pub enum ProblemType {
-    CVRP,
-}
+use crate::ProblemType;
 
 #[derive(Debug, PartialEq, thiserror::Error)]
 pub enum ProblemTypeParseError {

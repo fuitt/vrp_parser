@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 
-#[derive(Debug, PartialEq)]
-pub enum EdgeWeightType {
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) enum EdgeWeightType {
     Explicit,
 }
 
