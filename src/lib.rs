@@ -1,14 +1,10 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+pub(crate) mod common;
+pub(crate) mod instance;
+pub(crate) mod vrplib;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+pub use common::EdgeWeightKind;
+pub use common::ProblemType;
+pub use instance::VRPInstance;
+pub(crate) use instance::VRPInstanceBuilder;
+pub use vrplib::reader::LoadError;
+pub use vrplib::reader::read_from_vrplib;
