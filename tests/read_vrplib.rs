@@ -1,4 +1,4 @@
-use vrp_parser::{ProblemType, read_from_vrplib};
+use vrp_parser::{LoadError, ProblemType, read_from_vrplib};
 
 #[test]
 #[ignore]
@@ -18,4 +18,17 @@ fn test_read_from_vaplib_succeeds() {
         sut.edge_weights(),
         &[vec![0, 4, 5], vec![4, 0, 6], vec![5, 6, 0]]
     );
+}
+
+#[test]
+#[ignore]
+fn test_read_from_vrplib_fails() {
+    let filename = "tests/data/invalid_vrplib_format/edge_weights_not_given.txt";
+
+    let sut = read_from_vrplib(filename);
+
+    match sut {
+        Err(LoadError::Format(_)) => {}
+        _ => panic!(),
+    }
 }
