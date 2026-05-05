@@ -18,6 +18,33 @@ pub(crate) struct VRPInstanceBuilder {
     edge_weights: Option<Vec<Vec<u64>>>,
 }
 
+/// Represents a fully constructed Vehicle Routing Problem (VRP) instance
+/// loaded from a VRPLib file.
+///
+/// A `VRPInstance` contains all data required to describe a VRP, including
+/// problem metadata, node information, distance or cost matrices, and
+/// problem‑specific attributes such as vehicle capacity and customer demands.
+///
+/// This structure is created only after successful parsing and validation of
+/// a VRPLib file. All fields therefore represent a semantically consistent
+/// instance. Optional fields are present only for problem types that require
+/// them (e.g., capacity and demands for [`ProblemType::CVRP`]).
+///
+/// Edge weights are stored as a fully expanded matrix, regardless of the
+/// original VRPLib representation.
+///
+/// # Fields
+/// - `name`: The instance name as specified in the VRPLib file.
+/// - `problem_type`: The VRP variant (see [`ProblemType`]).
+/// - `dimension`: The number of nodes in the instance.
+/// - `depots`: Indices of depot nodes.
+/// - `edge_weights`: A fully expanded distance or cost matrix.
+/// - `capacity`: Vehicle capacity (if applicable).
+/// - `demands`: Customer demands for each node (if applicable).
+/// - `node_coords`: Node coordinates (if provided in the VRPLib file).
+///
+/// A `VRPInstance` is immutable after construction and can be used directly
+/// by solvers, heuristics, or analysis tools.
 #[derive(Debug, Clone, PartialEq)]
 pub struct VRPInstance {
     name: String,
@@ -197,34 +224,62 @@ impl VRPInstance {
             node_coords,
         }
     }
+
+    /// Returns the name of the instance as specified in the VRPLib file
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    /// Returns the problem type of this instance.
+    ///
+    /// See [`ProblemType`] for supported variants.
     pub fn problem_type(&self) -> ProblemType {
         self.problem_type
     }
 
+    /// Returns the number of nodes in the instance (`DIMENSION` in VRPLib).
     pub fn dimension(&self) -> usize {
         self.dimension
     }
-
+    /// Returns the list of node coordinates, if provided.
+    ///
+    /// Coordinate‑based VRPLib instances (e.g., `EUC_2D`, `GEO`) include
+    /// coordinates for each node. For explicit edge‑weight matrices, this
+    /// field is `None`.
     pub fn node_coords(&self) -> &Option<Vec<(u64, u64)>> {
         &self.node_coords
     }
 
+    /// Returns the demand value for each node, if applicable.
+    ///
+    /// This field is present for problem types that require customer demands,
+    /// such as [`ProblemType::CVRP`]. For other problem types, it is `None`.
     pub fn demands(&self) -> &Option<Vec<u64>> {
         &self.demands
     }
 
+    /// Returns the vehicle capacity, if defined for this instance.
+    ///
+    /// Capacity is required for capacitated VRP variants such as
+    /// [`ProblemType::CVRP`]. For problem types without capacity constraints,
+    /// this field is `None`.
     pub fn capacity(&self) -> &Option<u64> {
         &self.capacity
     }
 
+    /// Returns the indices of depot nodes.
+    ///
+    /// VRPLib allows multiple depots.
+    /// The indices refer to node positions in the instance.
     pub fn depots(&self) -> &[usize] {
         &self.depots
     }
 
+    /// Returns the fully expanded edge‑weight matrix.
+    ///
+    /// Regardless of the original VRPLib representation (explicit matrix,
+    /// compressed format, or coordinate‑based type), this method returns a
+    /// complete `dimension × dimension` matrix of edge weights.
     pub fn edge_weights(&self) -> &[Vec<u64>] {
         &self.edge_weights
     }
