@@ -28,7 +28,8 @@ fn test_read_from_vrplib_fails() {
     let sut = read_from_vrplib(filename);
 
     match sut {
-        Err(LoadError::Format(_)) => {}
+        Err(LoadError::Parse(_)) => {}
         _ => panic!(),
     }
+    // assert_eq!(sut.unwrap_err().to_string(), "abc");
 }

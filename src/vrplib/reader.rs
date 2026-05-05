@@ -2,27 +2,27 @@ use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
 
-use super::TokenParseError;
+use super::ParseError;
+use super::TokenError;
 use super::lexer::tokenize;
-use super::parser::FormatError;
 use super::parser::parse;
 use crate::VRPInstance;
 use crate::VRPInstanceBuilder;
-use crate::instance::InstanceError;
+use crate::instance::ValidationError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum LoadError {
-    #[error("I/O error: {0}")]
+    #[error("i/o error: {0}")]
     Io(#[from] std::io::Error),
 
-    #[error("Token parse error: {0}")]
-    TokenParse(#[from] TokenParseError),
+    #[error("token error: {0}")]
+    Token(#[from] TokenError),
 
-    #[error("Format error: {0}")]
-    Format(#[from] FormatError),
+    #[error("parse error: {0}")]
+    Parse(#[from] ParseError),
 
-    #[error("Instance error: {0}")]
-    Build(#[from] InstanceError),
+    #[error("validation error: {0}")]
+    Validation(#[from] ValidationError),
 }
 
 pub fn read_from_vrplib<P>(filename: P) -> Result<VRPInstance, LoadError>

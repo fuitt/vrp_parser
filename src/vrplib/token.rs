@@ -2,10 +2,10 @@ use std::{convert::TryFrom, num::ParseIntError};
 
 use crate::ProblemType;
 
-use super::ProblemTypeParseError;
-use super::{EdgeWeightFormat, EdgeWeightFormatParseError};
-use super::{EdgeWeightType, EdgeWeightTypeParseError};
-use super::{NodeCoordType, NodeCoordTypeParseError};
+use super::ParseProblemTypeError;
+use super::{EdgeWeightFormat, ParseEdgeWeightFormatError};
+use super::{EdgeWeightType, ParseEdgeWeightTypeError};
+use super::{NodeCoordType, ParseNodeCoordTypeError};
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum Token {
@@ -26,34 +26,34 @@ pub(crate) enum Token {
 }
 
 #[derive(Debug, PartialEq, thiserror::Error)]
-pub enum TokenParseError {
-    #[error("Invalid key: {0}")]
+pub enum TokenError {
+    #[error("invalid key: {0}")]
     Key(String),
 
-    #[error("Invalid value: {0}")]
+    #[error("invalid data: {0}")]
     Data(String),
 
-    #[error("Invalid value: {0}")]
-    ProblemType(#[from] ProblemTypeParseError),
+    #[error("invalid problem type: {0}")]
+    ProblemType(#[from] ParseProblemTypeError),
 
-    #[error("Invalid value: {0}")]
+    #[error("invalid dimension: {0}")]
     Dimension(#[from] ParseIntError),
 
-    #[error("Invalid value: {0}")]
-    EdgeWeightType(#[from] EdgeWeightTypeParseError),
+    #[error("invalid edge weight type: {0}")]
+    EdgeWeightType(#[from] ParseEdgeWeightTypeError),
 
-    #[error("Invalid value: {0}")]
-    EdgeWeightFormat(#[from] EdgeWeightFormatParseError),
+    #[error("invalid edge weight format: {0}")]
+    EdgeWeightFormat(#[from] ParseEdgeWeightFormatError),
 
-    #[error("Invalid value: {0}")]
-    NodeCoordType(#[from] NodeCoordTypeParseError),
+    #[error("invalid node coord type: {0}")]
+    NodeCoordType(#[from] ParseNodeCoordTypeError),
 
-    #[error("Invalid value: {0}")]
+    #[error("invalid capacity: {0}")]
     Capacity(ParseIntError),
 }
 
 impl TryFrom<&str> for Token {
-    type Error = TokenParseError;
+    type Error = TokenError;
 
     fn try_from(line: &str) -> Result<Self, Self::Error> {
         if line.contains(':') {
@@ -71,47 +71,45 @@ impl TryFrom<&str> for Token {
                 let prob_type = ProblemType::try_from(value);
                 return match prob_type {
                     Ok(_) => Ok(Token::Type(prob_type.unwrap())),
-                    Err(_) => Err(TokenParseError::ProblemType(prob_type.unwrap_err())),
+                    Err(_) => Err(TokenError::ProblemType(prob_type.unwrap_err())),
                 };
             }
             if key == "DIMENSION" {
                 let d = value.parse::<usize>();
                 return match d {
                     Ok(_) => Ok(Token::Dimension(d.unwrap())),
-                    Err(_) => Err(TokenParseError::Dimension(d.unwrap_err())),
+                    Err(_) => Err(TokenError::Dimension(d.unwrap_err())),
                 };
             }
             if key == "EDGE_WEIGHT_TYPE" {
                 let weight_type = EdgeWeightType::try_from(value);
                 return match weight_type {
                     Ok(_) => Ok(Token::EdgeWeightType(weight_type.unwrap())),
-                    Err(_) => Err(TokenParseError::EdgeWeightType(weight_type.unwrap_err())),
+                    Err(_) => Err(TokenError::EdgeWeightType(weight_type.unwrap_err())),
                 };
             }
             if key == "EDGE_WEIGHT_FORMAT" {
                 let weight_format = EdgeWeightFormat::try_from(value);
                 return match weight_format {
                     Ok(_) => Ok(Token::EdgeWeightFormat(weight_format.unwrap())),
-                    Err(_) => Err(TokenParseError::EdgeWeightFormat(
-                        weight_format.unwrap_err(),
-                    )),
+                    Err(_) => Err(TokenError::EdgeWeightFormat(weight_format.unwrap_err())),
                 };
             }
             if key == "NODE_COORD_TYPE" {
                 let coord_type = NodeCoordType::try_from(value);
                 return match coord_type {
                     Ok(_) => Ok(Token::NodeCoordType(coord_type.unwrap())),
-                    Err(_) => Err(TokenParseError::NodeCoordType(coord_type.unwrap_err())),
+                    Err(_) => Err(TokenError::NodeCoordType(coord_type.unwrap_err())),
                 };
             }
             if key == "CAPACITY" {
                 let d = value.parse::<u64>();
                 return match d {
                     Ok(_) => Ok(Token::Capacity(d.unwrap())),
-                    Err(_) => Err(TokenParseError::Capacity(d.unwrap_err())),
+                    Err(_) => Err(TokenError::Capacity(d.unwrap_err())),
                 };
             }
-            Err(TokenParseError::Key(key.to_string()))
+            Err(TokenError::Key(key.to_string()))
         } else {
             let line = line.trim();
             if line == "EDGE_WEIGHT_SECTION" {
@@ -133,7 +131,7 @@ impl TryFrom<&str> for Token {
                 line.split_whitespace().map(|x| x.parse::<u64>()).collect();
             match data {
                 Ok(_) => Ok(Token::Data(data.unwrap())),
-                Err(_) => Err(TokenParseError::Data(line.to_string())),
+                Err(_) => Err(TokenError::Data(line.to_string())),
             }
         }
     }
@@ -181,7 +179,7 @@ mod tests {
 
         assert_eq!(
             value,
-            TokenParseError::ProblemType(ProblemTypeParseError::UnknownType("foo_vrp".to_string()))
+            TokenError::ProblemType(ParseProblemTypeError::UnknownType("foo_vrp".to_string()))
         );
     }
 
@@ -301,7 +299,7 @@ mod tests {
 
         assert_eq!(
             value,
-            TokenParseError::Data("1 2 3 4 ABC 6 7 8 9 10".to_string())
+            TokenError::Data("1 2 3 4 ABC 6 7 8 9 10".to_string())
         );
     }
 }

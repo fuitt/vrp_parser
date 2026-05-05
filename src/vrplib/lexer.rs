@@ -1,5 +1,5 @@
-use super::{Token, TokenParseError};
+use super::{Token, TokenError};
 
-pub(crate) fn tokenize(line: &str) -> Result<Token, TokenParseError> {
+pub(crate) fn tokenize(line: &str) -> Result<Token, TokenError> {
     Token::try_from(line)
 }

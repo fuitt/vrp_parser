@@ -29,28 +29,36 @@ pub(crate) struct SectionData {
 }
 
 #[derive(Debug, PartialEq, thiserror::Error)]
-pub enum FormatError {
-    #[error("Missing name")]
+pub enum ParseError {
+    #[error("missing name")]
     MissingName,
-    #[error("Missing problem type")]
+
+    #[error("missing problem type")]
     MissingProblemType,
-    #[error("Missing dimension")]
+
+    #[error("missing dimension")]
     MissingDimension,
-    #[error("Missing edge weight type")]
+
+    #[error("missing edge weight type")]
     MissingEdgeWeightType,
-    #[error("Missing edge weight format")]
+
+    #[error("missing edge weight format")]
     MissingEdgeWeightFormat,
-    #[error("Invalid edge weight")]
+
+    #[error("invalid edge weight")]
     EdgeWeight,
-    #[error("Invalid node coord")]
+
+    #[error("invalid node coord")]
     NodeCoord,
-    #[error("Invalid demand")]
+
+    #[error("invalid demand")]
     Demand,
-    #[error("Invalid depot")]
+
+    #[error("invalid depot")]
     Depot,
 }
 
-pub(crate) fn parse(tokens: &[Token]) -> Result<SectionData, FormatError> {
+pub(crate) fn parse(tokens: &[Token]) -> Result<SectionData, ParseError> {
     let section_data = parse_tokens(tokens);
     validate_format(&section_data)?;
     Ok(section_data)
@@ -87,24 +95,24 @@ fn parse_tokens(tokens: &[Token]) -> SectionData {
     data
 }
 
-fn validate_format(section_data: &SectionData) -> Result<(), FormatError> {
-    section_data.name.as_ref().ok_or(FormatError::MissingName)?;
+fn validate_format(section_data: &SectionData) -> Result<(), ParseError> {
+    section_data.name.as_ref().ok_or(ParseError::MissingName)?;
     section_data
         .problem_type
         .as_ref()
-        .ok_or(FormatError::MissingProblemType)?;
+        .ok_or(ParseError::MissingProblemType)?;
     section_data
         .dimension
         .as_ref()
-        .ok_or(FormatError::MissingDimension)?;
+        .ok_or(ParseError::MissingDimension)?;
     section_data
         .edge_weight_type
         .as_ref()
-        .ok_or(FormatError::MissingEdgeWeightType)?;
+        .ok_or(ParseError::MissingEdgeWeightType)?;
     section_data
         .edge_weight_format
         .as_ref()
-        .ok_or(FormatError::MissingEdgeWeightFormat)?;
+        .ok_or(ParseError::MissingEdgeWeightFormat)?;
 
     let dimension = section_data.dimension.unwrap();
     let edge_weight_type = section_data.edge_weight_type.unwrap();
@@ -131,7 +139,7 @@ fn validate_edge_weights(
     edge_weight_type: EdgeWeightType,
     edge_weight_format: EdgeWeightFormat,
     edge_weights: &[Vec<u64>],
-) -> Result<(), FormatError> {
+) -> Result<(), ParseError> {
     match edge_weight_type {
         EdgeWeightType::Explicit => match edge_weight_format {
             EdgeWeightFormat::LowerRow => {
@@ -143,7 +151,7 @@ fn validate_edge_weights(
                 {
                     Ok(())
                 } else {
-                    Err(FormatError::EdgeWeight)
+                    Err(ParseError::EdgeWeight)
                 }
             }
         },
@@ -154,7 +162,7 @@ fn validate_node_coords(
     dimension: usize,
     node_coord_type: &Option<NodeCoordType>,
     node_coords: &[Vec<u64>],
-) -> Result<(), FormatError> {
+) -> Result<(), ParseError> {
     match node_coord_type {
         Some(coord_type) => match coord_type {
             NodeCoordType::TwodCoords => {
@@ -166,7 +174,7 @@ fn validate_node_coords(
                 {
                     Ok(())
                 } else {
-                    Err(FormatError::NodeCoord)
+                    Err(ParseError::NodeCoord)
                 }
             }
         },
@@ -174,13 +182,13 @@ fn validate_node_coords(
             if node_coords.is_empty() {
                 Ok(())
             } else {
-                Err(FormatError::NodeCoord)
+                Err(ParseError::NodeCoord)
             }
         }
     }
 }
 
-fn validate_demands(dimension: usize, demands: &[Vec<u64>]) -> Result<(), FormatError> {
+fn validate_demands(dimension: usize, demands: &[Vec<u64>]) -> Result<(), ParseError> {
     if dimension == demands.len()
         && demands
             .iter()
@@ -189,18 +197,18 @@ fn validate_demands(dimension: usize, demands: &[Vec<u64>]) -> Result<(), Format
     {
         Ok(())
     } else {
-        Err(FormatError::Demand)
+        Err(ParseError::Demand)
     }
 }
 
-fn validate_depots(dimension: usize, depots: &[Vec<u64>]) -> Result<(), FormatError> {
+fn validate_depots(dimension: usize, depots: &[Vec<u64>]) -> Result<(), ParseError> {
     if depots
         .iter()
         .all(|depot| depot.len() == 1 && 1 <= depot[0] && depot[0] <= (dimension as u64))
     {
         Ok(())
     } else {
-        Err(FormatError::Depot)
+        Err(ParseError::Depot)
     }
 }
 
@@ -293,7 +301,7 @@ mod tests {
 
         let value = validate_format(&sut);
 
-        let expected = Err(FormatError::MissingName);
+        let expected = Err(ParseError::MissingName);
         assert_eq!(value, expected);
     }
 
@@ -315,7 +323,7 @@ mod tests {
 
         let value = validate_format(&sut);
 
-        let expected = Err(FormatError::MissingProblemType);
+        let expected = Err(ParseError::MissingProblemType);
         assert_eq!(value, expected);
     }
 
@@ -337,7 +345,7 @@ mod tests {
 
         let value = validate_format(&sut);
 
-        let expected = Err(FormatError::MissingDimension);
+        let expected = Err(ParseError::MissingDimension);
         assert_eq!(value, expected);
     }
 
@@ -359,7 +367,7 @@ mod tests {
 
         let value = validate_format(&sut);
 
-        let expected = Err(FormatError::MissingEdgeWeightType);
+        let expected = Err(ParseError::MissingEdgeWeightType);
         assert_eq!(value, expected);
     }
 
@@ -381,7 +389,7 @@ mod tests {
 
         let value = validate_format(&sut);
 
-        let expected = Err(FormatError::MissingEdgeWeightFormat);
+        let expected = Err(ParseError::MissingEdgeWeightFormat);
         assert_eq!(value, expected);
     }
 
@@ -403,7 +411,7 @@ mod tests {
 
         let value = validate_format(&sut);
 
-        let expected = Err(FormatError::EdgeWeight);
+        let expected = Err(ParseError::EdgeWeight);
         assert_eq!(value, expected);
     }
 
@@ -425,7 +433,7 @@ mod tests {
 
         let value = validate_format(&sut);
 
-        let expected = Err(FormatError::NodeCoord);
+        let expected = Err(ParseError::NodeCoord);
         assert_eq!(value, expected);
     }
 
@@ -447,7 +455,7 @@ mod tests {
 
         let value = validate_format(&sut);
 
-        let expected = Err(FormatError::Demand);
+        let expected = Err(ParseError::Demand);
         assert_eq!(value, expected);
     }
 
@@ -469,7 +477,7 @@ mod tests {
 
         let value = validate_format(&sut);
 
-        let expected = Err(FormatError::Depot);
+        let expected = Err(ParseError::Depot);
         assert_eq!(value, expected);
     }
 }

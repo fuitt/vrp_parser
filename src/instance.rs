@@ -31,16 +31,16 @@ pub struct VRPInstance {
 }
 
 #[derive(Debug, PartialEq, thiserror::Error)]
-pub enum InstanceError {
-    #[error("Missing capacity")]
+pub enum ValidationError {
+    #[error("missing capacity")]
     MissingCapacity,
-    #[error("Missing demands")]
+    #[error("missing demands")]
     MissingDemands,
-    #[error("Missing depots")]
+    #[error("missing depots")]
     MissingDepots,
-    #[error("Missing edge weight")]
+    #[error("missing edge weight")]
     MissingEdgeWeight,
-    #[error("Invalid demands length")]
+    #[error("invalid demands length")]
     InvalidDemandsLength,
 }
 
@@ -88,26 +88,28 @@ impl VRPInstanceBuilder {
         self
     }
 
-    pub fn build(self) -> Result<VRPInstance, InstanceError> {
+    pub fn build(self) -> Result<VRPInstance, ValidationError> {
         let edge_weights = match self.edge_weight_kind {
             EdgeWeightKind::LowerRow => {
                 self.edge_weights
                     .as_ref()
-                    .ok_or(InstanceError::MissingEdgeWeight)?;
+                    .ok_or(ValidationError::MissingEdgeWeight)?;
                 expand_lower_row(self.edge_weights.as_ref().unwrap())
             }
         };
 
         if self.depots.is_empty() {
-            return Err(InstanceError::MissingDepots);
+            return Err(ValidationError::MissingDepots);
         }
 
         match self.problem_type {
             ProblemType::CVRP => {
                 self.capacity
                     .as_ref()
-                    .ok_or(InstanceError::MissingCapacity)?;
-                self.demands.as_ref().ok_or(InstanceError::MissingDemands)?;
+                    .ok_or(ValidationError::MissingCapacity)?;
+                self.demands
+                    .as_ref()
+                    .ok_or(ValidationError::MissingDemands)?;
 
                 self.validate_demands()?;
 
@@ -125,11 +127,11 @@ impl VRPInstanceBuilder {
         }
     }
 
-    fn validate_demands(&self) -> Result<(), InstanceError> {
+    fn validate_demands(&self) -> Result<(), ValidationError> {
         if let Some(demands) = &self.demands
             && demands.len() != self.dimension
         {
-            return Err(InstanceError::InvalidDemandsLength);
+            return Err(ValidationError::InvalidDemandsLength);
         }
         Ok(())
     }
@@ -311,7 +313,7 @@ mod tests {
 
         let value = sut.build().unwrap_err();
 
-        let expected = InstanceError::MissingDepots;
+        let expected = ValidationError::MissingDepots;
         assert_eq!(value, expected);
     }
 
@@ -331,7 +333,7 @@ mod tests {
 
         let value = sut.build().unwrap_err();
 
-        let expected = InstanceError::MissingDemands;
+        let expected = ValidationError::MissingDemands;
         assert_eq!(value, expected);
     }
 
@@ -351,7 +353,7 @@ mod tests {
 
         let value = sut.build().unwrap_err();
 
-        let expected = InstanceError::MissingCapacity;
+        let expected = ValidationError::MissingCapacity;
         assert_eq!(value, expected);
     }
 
@@ -371,7 +373,7 @@ mod tests {
 
         let value = sut.build().unwrap_err();
 
-        let expected = InstanceError::MissingEdgeWeight;
+        let expected = ValidationError::MissingEdgeWeight;
         assert_eq!(value, expected);
     }
 }

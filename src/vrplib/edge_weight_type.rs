@@ -6,19 +6,19 @@ pub(crate) enum EdgeWeightType {
 }
 
 #[derive(Debug, PartialEq, thiserror::Error)]
-pub enum EdgeWeightTypeParseError {
-    #[error("Unknown edge weight type: {0}")]
+pub enum ParseEdgeWeightTypeError {
+    #[error("unknown edge weight type: {0}")]
     UnknownType(String),
 }
 
 impl TryFrom<&str> for EdgeWeightType {
-    type Error = EdgeWeightTypeParseError;
+    type Error = ParseEdgeWeightTypeError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         if value == "EXPLICIT" {
             return Ok(EdgeWeightType::Explicit);
         }
-        Err(EdgeWeightTypeParseError::UnknownType(value.to_string()))
+        Err(ParseEdgeWeightTypeError::UnknownType(value.to_string()))
     }
 }
 
@@ -43,7 +43,7 @@ mod tests {
 
         assert_eq!(
             value,
-            EdgeWeightTypeParseError::UnknownType("foo_edge_weight".to_string())
+            ParseEdgeWeightTypeError::UnknownType("foo_edge_weight".to_string())
         );
     }
 }

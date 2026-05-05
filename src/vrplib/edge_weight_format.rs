@@ -6,19 +6,19 @@ pub(crate) enum EdgeWeightFormat {
 }
 
 #[derive(Debug, PartialEq, thiserror::Error)]
-pub enum EdgeWeightFormatParseError {
-    #[error("Unknown edge weight format: {0}")]
+pub enum ParseEdgeWeightFormatError {
+    #[error("unknown edge weight format: {0}")]
     UnknownFormat(String),
 }
 
 impl TryFrom<&str> for EdgeWeightFormat {
-    type Error = EdgeWeightFormatParseError;
+    type Error = ParseEdgeWeightFormatError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         if value == "LOWER_ROW" {
             return Ok(EdgeWeightFormat::LowerRow);
         }
-        Err(EdgeWeightFormatParseError::UnknownFormat(value.to_string()))
+        Err(ParseEdgeWeightFormatError::UnknownFormat(value.to_string()))
     }
 }
 
@@ -43,7 +43,7 @@ mod tests {
 
         assert_eq!(
             value,
-            EdgeWeightFormatParseError::UnknownFormat("foo_edge_weight".to_string())
+            ParseEdgeWeightFormatError::UnknownFormat("foo_edge_weight".to_string())
         );
     }
 }
