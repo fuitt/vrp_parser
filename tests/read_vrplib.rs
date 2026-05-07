@@ -32,14 +32,3 @@ fn test_read_from_vrplib_fails() {
         _ => panic!(),
     }
 }
-
-#[test]
-#[ignore]
-fn test_read_ortec_n242_k12_instance_succeeds() {
-    // An example in rustdocs
-    let filename = "dat/ORTEC-n242-k12.vrp";
-
-    let sut = read_from_vrplib(filename).unwrap();
-
-    assert_eq!(sut.dimension(), 242);
-}
