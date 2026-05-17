@@ -45,6 +45,9 @@ pub enum ParseError {
     #[error("missing edge weight format")]
     MissingEdgeWeightFormat,
 
+    #[error("missing node coord type")]
+    MissingNodeCoordType,
+
     #[error("invalid edge weight")]
     EdgeWeight,
 
@@ -109,23 +112,19 @@ fn validate_format(section_data: &SectionData) -> Result<(), ParseError> {
         .edge_weight_type
         .as_ref()
         .ok_or(ParseError::MissingEdgeWeightType)?;
-    section_data
-        .edge_weight_format
-        .as_ref()
-        .ok_or(ParseError::MissingEdgeWeightFormat)?;
 
     let dimension = section_data.dimension.unwrap();
     let edge_weight_type = section_data.edge_weight_type.unwrap();
-    let edge_weight_format = section_data.edge_weight_format.unwrap();
 
     validate_edge_weights(
         dimension,
         edge_weight_type,
-        edge_weight_format,
+        section_data.edge_weight_format,
         &section_data.edge_weights,
     )?;
     validate_node_coords(
         dimension,
+        edge_weight_type,
         &section_data.node_coord_type,
         &section_data.node_coords,
     )?;
@@ -137,55 +136,75 @@ fn validate_format(section_data: &SectionData) -> Result<(), ParseError> {
 fn validate_edge_weights(
     dimension: usize,
     edge_weight_type: EdgeWeightType,
-    edge_weight_format: EdgeWeightFormat,
+    edge_weight_format: Option<EdgeWeightFormat>,
     edge_weights: &[Vec<u64>],
 ) -> Result<(), ParseError> {
     match edge_weight_type {
-        EdgeWeightType::Explicit => match edge_weight_format {
-            EdgeWeightFormat::LowerRow => {
-                if dimension - 1 == edge_weights.len()
-                    && edge_weights
-                        .iter()
-                        .enumerate()
-                        .all(|(i, weights)| (i + 1) == weights.len())
-                {
-                    Ok(())
-                } else {
-                    Err(ParseError::EdgeWeight)
+        EdgeWeightType::Explicit => {
+            if let Some(fmt) = edge_weight_format {
+                match fmt {
+                    EdgeWeightFormat::LowerRow => {
+                        if dimension - 1 == edge_weights.len()
+                            && edge_weights
+                                .iter()
+                                .enumerate()
+                                .all(|(i, weights)| (i + 1) == weights.len())
+                        {
+                            Ok(())
+                        } else {
+                            Err(ParseError::EdgeWeight)
+                        }
+                    }
                 }
+            } else {
+                Err(ParseError::MissingEdgeWeightFormat)
             }
-        },
+        }
+        EdgeWeightType::Euc2D => Ok(()),
     }
 }
 
 fn validate_node_coords(
     dimension: usize,
+    edge_weight_type: EdgeWeightType,
     node_coord_type: &Option<NodeCoordType>,
     node_coords: &[Vec<u64>],
 ) -> Result<(), ParseError> {
-    match node_coord_type {
-        Some(coord_type) => match coord_type {
-            NodeCoordType::TwodCoords => {
-                if dimension == node_coords.len()
-                    && node_coords
-                        .iter()
-                        .enumerate()
-                        .all(|(i, coords)| coords.len() == 3 && i + 1 == (coords[0] as usize))
-                {
-                    Ok(())
-                } else {
-                    Err(ParseError::NodeCoord)
+    match edge_weight_type {
+        EdgeWeightType::Explicit => match node_coord_type {
+            Some(_) => {}
+            None => {
+                if !node_coords.is_empty() {
+                    return Err(ParseError::MissingNodeCoordType);
                 }
             }
         },
-        None => {
-            if node_coords.is_empty() {
-                Ok(())
-            } else {
-                Err(ParseError::NodeCoord)
+        EdgeWeightType::Euc2D => {
+            if !is_2d_coords(dimension, node_coords) {
+                return Err(ParseError::NodeCoord);
             }
         }
     }
+
+    if let Some(coord_type) = node_coord_type {
+        match coord_type {
+            NodeCoordType::TwodCoords => {
+                if !is_2d_coords(dimension, node_coords) {
+                    return Err(ParseError::NodeCoord);
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn is_2d_coords(dimension: usize, node_coords: &[Vec<u64>]) -> bool {
+    dimension == node_coords.len()
+        && node_coords
+            .iter()
+            .enumerate()
+            .all(|(i, coords)| coords.len() == 3 && i + 1 == (coords[0] as usize))
 }
 
 fn validate_demands(dimension: usize, demands: &[Vec<u64>]) -> Result<(), ParseError> {
@@ -424,6 +443,50 @@ mod tests {
             edge_weight_type: Some(EdgeWeightType::Explicit),
             edge_weight_format: Some(EdgeWeightFormat::LowerRow),
             node_coord_type: Some(NodeCoordType::TwodCoords),
+            capacity: Some(2),
+            edge_weights: vec![vec![4], vec![5, 6]],
+            node_coords: vec![vec![1, 0, 0, 0], vec![2, 7, 8, 0], vec![3, 9, 10, 0]], // 3D coords
+            demands: vec![vec![1, 0], vec![2, 11], vec![3, 12]],
+            depots: vec![vec![1]],
+        };
+
+        let value = validate_format(&sut);
+
+        let expected = Err(ParseError::NodeCoord);
+        assert_eq!(value, expected);
+    }
+
+    #[test]
+    fn test_validate_format_fails_if_node_coords_type_not_given() {
+        let sut = SectionData {
+            name: Some("This is a name.".to_string()),
+            problem_type: Some(ProblemType::CVRP),
+            dimension: Some(3),
+            edge_weight_type: Some(EdgeWeightType::Explicit),
+            edge_weight_format: Some(EdgeWeightFormat::LowerRow),
+            node_coord_type: None,
+            capacity: Some(2),
+            edge_weights: vec![vec![4], vec![5, 6]],
+            node_coords: vec![vec![1, 0, 0], vec![2, 7, 8], vec![3, 9, 10]],
+            demands: vec![vec![1, 0], vec![2, 11], vec![3, 12]],
+            depots: vec![vec![1]],
+        };
+
+        let value = validate_format(&sut);
+
+        let expected = Err(ParseError::MissingNodeCoordType);
+        assert_eq!(value, expected);
+    }
+
+    #[test]
+    fn test_validate_format_fails_if_node_coords_are_invalid_euc2d() {
+        let sut = SectionData {
+            name: Some("This is a name.".to_string()),
+            problem_type: Some(ProblemType::CVRP),
+            dimension: Some(3),
+            edge_weight_type: Some(EdgeWeightType::Euc2D),
+            edge_weight_format: None,
+            node_coord_type: None,
             capacity: Some(2),
             edge_weights: vec![vec![4], vec![5, 6]],
             node_coords: vec![vec![1, 0, 0, 0], vec![2, 7, 8, 0], vec![3, 9, 10, 0]], // 3D coords

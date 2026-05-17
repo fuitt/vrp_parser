@@ -2,6 +2,7 @@ use std::convert::TryFrom;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) enum EdgeWeightType {
+    Euc2D,
     Explicit,
 }
 
@@ -18,6 +19,9 @@ impl TryFrom<&str> for EdgeWeightType {
         if value == "EXPLICIT" {
             return Ok(EdgeWeightType::Explicit);
         }
+        if value == "EUC_2D" {
+            return Ok(EdgeWeightType::Euc2D);
+        }
         Err(ParseEdgeWeightTypeError::UnknownType(value.to_string()))
     }
 }
@@ -33,6 +37,15 @@ mod tests {
         let value = EdgeWeightType::try_from(s).unwrap();
 
         assert_eq!(value, EdgeWeightType::Explicit);
+    }
+
+    #[test]
+    fn test_parse_euc_2d() {
+        let s = "EUC_2D";
+
+        let value = EdgeWeightType::try_from(s).unwrap();
+
+        assert_eq!(value, EdgeWeightType::Euc2D);
     }
 
     #[test]

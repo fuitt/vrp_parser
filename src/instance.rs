@@ -1,9 +1,8 @@
 use crate::EdgeWeightKind;
 use crate::ProblemType;
+use crate::common::edge_weight::edge_weight_by_euc2d;
 use crate::common::matrix::expand_lower_row;
-use crate::vrplib::{
-    edge_weight_format::EdgeWeightFormat, edge_weight_type::EdgeWeightType, parser::SectionData,
-};
+use crate::vrplib::parser::SectionData;
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct VRPInstanceBuilder {
@@ -67,6 +66,8 @@ pub enum ValidationError {
     MissingDepots,
     #[error("missing edge weight")]
     MissingEdgeWeight,
+    #[error("missing node coords")]
+    MissingNodeCoords,
     #[error("invalid demands length")]
     InvalidDemandsLength,
 }
@@ -123,6 +124,20 @@ impl VRPInstanceBuilder {
                     .ok_or(ValidationError::MissingEdgeWeight)?;
                 expand_lower_row(self.edge_weights.as_ref().unwrap())
             }
+            EdgeWeightKind::Euc2D => self
+                .node_coords
+                .as_ref()
+                .ok_or(ValidationError::MissingNodeCoords)?
+                .iter()
+                .map(|&p| {
+                    self.node_coords
+                        .as_ref()
+                        .unwrap()
+                        .iter()
+                        .map(|&q| edge_weight_by_euc2d(p, q))
+                        .collect()
+                })
+                .collect(),
         };
 
         if self.depots.is_empty() {
@@ -165,12 +180,11 @@ impl VRPInstanceBuilder {
 
     pub(crate) fn make_from_vrplib(section_data: SectionData) -> Self {
         let name = section_data.name.unwrap();
-        let edge_weight_kind = match (
+        let edge_weight_kind = EdgeWeightKind::new(
             section_data.edge_weight_type.unwrap(),
-            section_data.edge_weight_format.unwrap(),
-        ) {
-            (EdgeWeightType::Explicit, EdgeWeightFormat::LowerRow) => EdgeWeightKind::LowerRow,
-        };
+            section_data.edge_weight_format,
+        )
+        .unwrap();
         let depots = section_data
             .depots
             .iter()
@@ -289,6 +303,8 @@ impl VRPInstance {
 mod tests {
 
     use super::*;
+    use crate::vrplib::edge_weight_format::EdgeWeightFormat;
+    use crate::vrplib::edge_weight_type::EdgeWeightType;
     use crate::vrplib::node_coord_type::NodeCoordType;
 
     #[test]
@@ -420,15 +436,35 @@ mod tests {
             dimension: 3,
             edge_weight_kind: EdgeWeightKind::LowerRow,
             depots: vec![1],
-            capacity: None, // not given
+            capacity: None,
             demands: Some(vec![0, 11, 12]),
             node_coords: Some(vec![(0, 0), (7, 8), (9, 10)]),
-            edge_weights: None,
+            edge_weights: None, // not given
         };
 
         let value = sut.build().unwrap_err();
 
         let expected = ValidationError::MissingEdgeWeight;
+        assert_eq!(value, expected);
+    }
+
+    #[test]
+    fn test_build_fails_if_missing_node_coords() {
+        let sut = VRPInstanceBuilder {
+            name: "This is a name.".to_string(),
+            problem_type: ProblemType::CVRP,
+            dimension: 3,
+            edge_weight_kind: EdgeWeightKind::Euc2D,
+            depots: vec![1],
+            capacity: None,
+            demands: Some(vec![0, 11, 12]),
+            node_coords: None, // not given
+            edge_weights: None,
+        };
+
+        let value = sut.build().unwrap_err();
+
+        let expected = ValidationError::MissingNodeCoords;
         assert_eq!(value, expected);
     }
 }
