@@ -1,8 +1,8 @@
 use crate::common::round::nint;
 
-pub(crate) fn edge_weight_by_euc2d(p: (u64, u64), q: (u64, u64)) -> u64 {
-    let dx = (p.0 as f64) - (q.0 as f64);
-    let dy = (p.1 as f64) - (q.1 as f64);
+pub(crate) fn edge_weight_by_euc2d(p: (f64, f64), q: (f64, f64)) -> u64 {
+    let dx = p.0 - q.0;
+    let dy = p.1 - q.1;
     nint((dx * dx + dy * dy).sqrt())
 }
 
@@ -12,8 +12,8 @@ mod tests {
 
     #[test]
     fn test_nint_truncates() {
-        let p = (1, 2);
-        let q = (3, 5);
+        let p = (1.0, 2.0);
+        let q = (3.0, 5.0);
 
         let value = edge_weight_by_euc2d(p, q);
 

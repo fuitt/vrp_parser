@@ -61,7 +61,7 @@ pub enum LoadError {
 /// let instance = vrp_parser::read_from_vrplib("ORTEC-n242-k12.vrp").unwrap();
 /// assert_eq!(instance.dimension(), 242);
 /// ```
-pub fn read_from_vrplib<P>(filename: P) -> Result<VRPInstance, LoadError>
+pub fn read_from_vrplib<P>(filename: P) -> Result<VRPInstance<u64>, LoadError>
 where
     P: AsRef<Path>,
 {

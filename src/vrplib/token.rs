@@ -22,16 +22,13 @@ pub(crate) enum Token {
     DemandSection,
     DepotSection,
     Eof,
-    Data(Vec<u64>),
+    Data(Vec<String>),
 }
 
 #[derive(Debug, PartialEq, thiserror::Error)]
 pub enum TokenError {
     #[error("invalid key: {0}")]
     Key(String),
-
-    #[error("invalid data: {0}")]
-    Data(String),
 
     #[error("invalid problem type: {0}")]
     ProblemType(#[from] ParseProblemTypeError),
@@ -127,12 +124,8 @@ impl TryFrom<&str> for Token {
             if line == "-1" || line == "EOF" {
                 return Ok(Token::Eof);
             }
-            let data: Result<Vec<_>, _> =
-                line.split_whitespace().map(|x| x.parse::<u64>()).collect();
-            match data {
-                Ok(_) => Ok(Token::Data(data.unwrap())),
-                Err(_) => Err(TokenError::Data(line.to_string())),
-            }
+            let data: Vec<String> = line.split_whitespace().map(|x| x.to_string()).collect();
+            Ok(Token::Data(data))
         }
     }
 }
@@ -288,18 +281,20 @@ mod tests {
 
         let value = Token::try_from(s).unwrap();
 
-        assert_eq!(value, Token::Data(vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10]));
-    }
-
-    #[test]
-    fn test_parse_data_fails() {
-        let s = "  1 2 3 4 ABC 6 7 8 9 10\n";
-
-        let value = Token::try_from(s).unwrap_err();
-
         assert_eq!(
             value,
-            TokenError::Data("1 2 3 4 ABC 6 7 8 9 10".to_string())
+            Token::Data(vec![
+                "1".to_string(),
+                "2".to_string(),
+                "3".to_string(),
+                "4".to_string(),
+                "5".to_string(),
+                "6".to_string(),
+                "7".to_string(),
+                "8".to_string(),
+                "9".to_string(),
+                "10".to_string()
+            ])
         );
     }
 }
