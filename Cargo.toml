@@ -2,6 +2,12 @@
 name = "vrp_parser"
 version = "0.1.0"
 edition = "2024"
+description = "A library for parsing VRPLib-formatted files."
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/fuitt/vrp_parser"
+documentation = "https://docs.rs/vrp_parser"
+keywords = ["vrp", "vrplib", "parser", "optimization"]
 
 [dependencies]
 thiserror = "2.0"
