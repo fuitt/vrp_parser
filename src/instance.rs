@@ -1,50 +1,86 @@
 use crate::EdgeWeightKind;
 use crate::ProblemType;
+use crate::common::edge_weight::edge_weight_by_euc2d;
 use crate::common::matrix::expand_lower_row;
-use crate::vrplib::{
-    edge_weight_format::EdgeWeightFormat, edge_weight_type::EdgeWeightType, parser::SectionData,
-};
+use crate::vrplib::parser::SectionData;
 
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct VRPInstanceBuilder {
+pub(crate) struct VRPInstanceBuilder<T> {
     name: String,
     problem_type: ProblemType,
     edge_weight_kind: EdgeWeightKind,
     dimension: usize,
     depots: Vec<usize>,
-    capacity: Option<u64>,
-    demands: Option<Vec<u64>>,
-    node_coords: Option<Vec<(u64, u64)>>,
-    edge_weights: Option<Vec<Vec<u64>>>,
+    capacity: Option<T>,
+    demands: Option<Vec<T>>,
+    node_coords: Option<Vec<(f64, f64)>>,
+    edge_weights: Option<Vec<Vec<T>>>,
 }
 
+/// Represents a fully constructed Vehicle Routing Problem (VRP) instance
+/// loaded from a VRPLib file.
+///
+/// A `VRPInstance<T>` contains all data required to describe a VRP, including
+/// problem metadata, node information, distance or cost matrices, and
+/// problem‑specific attributes such as vehicle capacity and customer demands.
+/// The type parameter `T` determines the numeric representation used for values
+/// such as edge weights and demands. Common choices include `u64` for standard
+/// VRPLib instances.
+///
+/// This structure is created only after successful parsing and validation of
+/// a VRPLib file. All fields therefore represent a semantically consistent
+/// instance. Optional fields are present only for problem types that require
+/// them (e.g., capacity and demands for [`ProblemType::CVRP`]).
+///
+/// Edge weights are stored as a fully expanded matrix, regardless of the
+/// original VRPLib representation.
+///
+/// # Type Parameters
+/// - `T`: The numeric type representing values such as edge weights and demands.
+///   Typically:
+///   - `u64`: The standard VRPLib-compliant integer representation.
+///
+/// # Fields
+/// - `name`: The instance name as specified in the VRPLib file.
+/// - `problem_type`: The VRP variant (see [`ProblemType`]).
+/// - `dimension`: The number of nodes in the instance.
+/// - `depots`: Indices of depot nodes.
+/// - `edge_weights`: A fully expanded distance or cost matrix.
+/// - `capacity`: Vehicle capacity (if applicable).
+/// - `demands`: Customer demands for each node (if applicable).
+/// - `node_coords`: Node coordinates (if provided in the VRPLib file).
+///
+/// A `VRPInstance` is immutable after construction and can be used directly
+/// by solvers, heuristics, or analysis tools.
 #[derive(Debug, Clone, PartialEq)]
-pub struct VRPInstance {
+pub struct VRPInstance<T> {
     name: String,
     problem_type: ProblemType,
     dimension: usize,
     depots: Vec<usize>,
-    edge_weights: Vec<Vec<u64>>,
-    capacity: Option<u64>,
-    demands: Option<Vec<u64>>,
-    node_coords: Option<Vec<(u64, u64)>>,
+    edge_weights: Vec<Vec<T>>,
+    capacity: Option<T>,
+    demands: Option<Vec<T>>,
+    node_coords: Option<Vec<(f64, f64)>>,
 }
 
 #[derive(Debug, PartialEq, thiserror::Error)]
-pub enum InstanceError {
-    #[error("Missing capacity")]
+pub enum ValidationError {
+    #[error("missing capacity")]
     MissingCapacity,
-    #[error("Missing demands")]
+    #[error("missing demands")]
     MissingDemands,
-    #[error("Missing depots")]
+    #[error("missing depots")]
     MissingDepots,
-    #[error("Missing edge weight")]
+    #[error("missing edge weight")]
     MissingEdgeWeight,
-    #[error("Invalid demands length")]
+    #[error("missing node coords")]
+    MissingNodeCoords,
+    #[error("invalid demands length")]
     InvalidDemandsLength,
 }
 
-impl VRPInstanceBuilder {
+impl VRPInstanceBuilder<u64> {
     pub fn new(
         name: String,
         problem_type: ProblemType,
@@ -79,7 +115,7 @@ impl VRPInstanceBuilder {
         self
     }
 
-    pub fn node_coords(mut self, node_coords: Option<Vec<(u64, u64)>>) -> Self {
+    pub fn node_coords(mut self, node_coords: Option<Vec<(f64, f64)>>) -> Self {
         self.node_coords = node_coords;
         self
     }
@@ -88,26 +124,42 @@ impl VRPInstanceBuilder {
         self
     }
 
-    pub fn build(self) -> Result<VRPInstance, InstanceError> {
+    pub fn build(self) -> Result<VRPInstance<u64>, ValidationError> {
         let edge_weights = match self.edge_weight_kind {
             EdgeWeightKind::LowerRow => {
                 self.edge_weights
                     .as_ref()
-                    .ok_or(InstanceError::MissingEdgeWeight)?;
+                    .ok_or(ValidationError::MissingEdgeWeight)?;
                 expand_lower_row(self.edge_weights.as_ref().unwrap())
             }
+            EdgeWeightKind::Euc2D => self
+                .node_coords
+                .as_ref()
+                .ok_or(ValidationError::MissingNodeCoords)?
+                .iter()
+                .map(|&p| {
+                    self.node_coords
+                        .as_ref()
+                        .unwrap()
+                        .iter()
+                        .map(|&q| edge_weight_by_euc2d(p, q))
+                        .collect()
+                })
+                .collect(),
         };
 
         if self.depots.is_empty() {
-            return Err(InstanceError::MissingDepots);
+            return Err(ValidationError::MissingDepots);
         }
 
         match self.problem_type {
             ProblemType::CVRP => {
                 self.capacity
                     .as_ref()
-                    .ok_or(InstanceError::MissingCapacity)?;
-                self.demands.as_ref().ok_or(InstanceError::MissingDemands)?;
+                    .ok_or(ValidationError::MissingCapacity)?;
+                self.demands
+                    .as_ref()
+                    .ok_or(ValidationError::MissingDemands)?;
 
                 self.validate_demands()?;
 
@@ -125,28 +177,23 @@ impl VRPInstanceBuilder {
         }
     }
 
-    fn validate_demands(&self) -> Result<(), InstanceError> {
+    fn validate_demands(&self) -> Result<(), ValidationError> {
         if let Some(demands) = &self.demands
             && demands.len() != self.dimension
         {
-            return Err(InstanceError::InvalidDemandsLength);
+            return Err(ValidationError::InvalidDemandsLength);
         }
         Ok(())
     }
 
     pub(crate) fn make_from_vrplib(section_data: SectionData) -> Self {
         let name = section_data.name.unwrap();
-        let edge_weight_kind = match (
+        let edge_weight_kind = EdgeWeightKind::new(
             section_data.edge_weight_type.unwrap(),
-            section_data.edge_weight_format.unwrap(),
-        ) {
-            (EdgeWeightType::Explicit, EdgeWeightFormat::LowerRow) => EdgeWeightKind::LowerRow,
-        };
-        let depots = section_data
-            .depots
-            .iter()
-            .map(|depot| depot[0] as usize)
-            .collect();
+            section_data.edge_weight_format,
+        )
+        .unwrap();
+        let depots = section_data.depots.iter().map(|depot| depot[0]).collect();
         let demands = section_data
             .demands
             .iter()
@@ -155,7 +202,7 @@ impl VRPInstanceBuilder {
         let node_coords = section_data
             .node_coords
             .iter()
-            .map(|coords| (coords[1], coords[2]))
+            .map(|coords| (coords[0], coords[1]))
             .collect();
 
         Self::new(
@@ -172,17 +219,17 @@ impl VRPInstanceBuilder {
     }
 }
 
-impl VRPInstance {
+impl<T> VRPInstance<T> {
     #[allow(clippy::too_many_arguments)]
     fn new(
         name: String,
         problem_type: ProblemType,
         dimension: usize,
         depots: Vec<usize>,
-        edge_weights: Vec<Vec<u64>>,
-        capacity: Option<u64>,
-        demands: Option<Vec<u64>>,
-        node_coords: Option<Vec<(u64, u64)>>,
+        edge_weights: Vec<Vec<T>>,
+        capacity: Option<T>,
+        demands: Option<Vec<T>>,
+        node_coords: Option<Vec<(f64, f64)>>,
     ) -> Self {
         Self {
             name,
@@ -195,35 +242,63 @@ impl VRPInstance {
             node_coords,
         }
     }
+
+    /// Returns the name of the instance as specified in the VRPLib file
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    /// Returns the problem type of this instance.
+    ///
+    /// See [`ProblemType`] for supported variants.
     pub fn problem_type(&self) -> ProblemType {
         self.problem_type
     }
 
+    /// Returns the number of nodes in the instance (`DIMENSION` in VRPLib).
     pub fn dimension(&self) -> usize {
         self.dimension
     }
-
-    pub fn node_coords(&self) -> &Option<Vec<(u64, u64)>> {
+    /// Returns the list of node coordinates, if provided.
+    ///
+    /// Coordinate‑based VRPLib instances (e.g., `EUC_2D`, `GEO`) include
+    /// coordinates for each node. For explicit edge‑weight matrices, this
+    /// field is `None`.
+    pub fn node_coords(&self) -> &Option<Vec<(f64, f64)>> {
         &self.node_coords
     }
 
-    pub fn demands(&self) -> &Option<Vec<u64>> {
+    /// Returns the demand value for each node, if applicable.
+    ///
+    /// This field is present for problem types that require customer demands,
+    /// such as [`ProblemType::CVRP`]. For other problem types, it is `None`.
+    pub fn demands(&self) -> &Option<Vec<T>> {
         &self.demands
     }
 
-    pub fn capacity(&self) -> &Option<u64> {
+    /// Returns the vehicle capacity, if defined for this instance.
+    ///
+    /// Capacity is required for capacitated VRP variants such as
+    /// [`ProblemType::CVRP`]. For problem types without capacity constraints,
+    /// this field is `None`.
+    pub fn capacity(&self) -> &Option<T> {
         &self.capacity
     }
 
+    /// Returns the indices of depot nodes.
+    ///
+    /// VRPLib allows multiple depots.
+    /// The indices refer to node positions in the instance.
     pub fn depots(&self) -> &[usize] {
         &self.depots
     }
 
-    pub fn edge_weights(&self) -> &[Vec<u64>] {
+    /// Returns the fully expanded edge‑weight matrix.
+    ///
+    /// Regardless of the original VRPLib representation (explicit matrix,
+    /// compressed format, or coordinate‑based type), this method returns a
+    /// complete `dimension × dimension` matrix of edge weights.
+    pub fn edge_weights(&self) -> &[Vec<T>] {
         &self.edge_weights
     }
 }
@@ -232,6 +307,8 @@ impl VRPInstance {
 mod tests {
 
     use super::*;
+    use crate::vrplib::edge_weight_format::EdgeWeightFormat;
+    use crate::vrplib::edge_weight_type::EdgeWeightType;
     use crate::vrplib::node_coord_type::NodeCoordType;
 
     #[test]
@@ -245,7 +322,7 @@ mod tests {
             node_coord_type: Some(NodeCoordType::TwodCoords),
             capacity: Some(2),
             edge_weights: vec![vec![4], vec![5, 6]],
-            node_coords: vec![vec![1, 0, 0], vec![2, 7, 8], vec![3, 9, 10]],
+            node_coords: vec![vec![0.0, 0.0], vec![7.0, 8.0], vec![9.0, 10.0]],
             demands: vec![vec![1, 0], vec![2, 11], vec![3, 12]],
             depots: vec![vec![1]],
         };
@@ -260,7 +337,7 @@ mod tests {
             depots: vec![1],
             capacity: Some(2),
             demands: Some(vec![0, 11, 12]),
-            node_coords: Some(vec![(0, 0), (7, 8), (9, 10)]),
+            node_coords: Some(vec![(0.0, 0.0), (7.0, 8.0), (9.0, 10.0)]),
             edge_weights: Some(vec![vec![4], vec![5, 6]]),
         };
         assert_eq!(value, expected);
@@ -276,7 +353,7 @@ mod tests {
             depots: vec![1],
             capacity: Some(2),
             demands: Some(vec![0, 11, 12]),
-            node_coords: Some(vec![(0, 0), (7, 8), (9, 10)]),
+            node_coords: Some(vec![(0.0, 0.0), (7.0, 8.0), (9.0, 10.0)]),
             edge_weights: Some(vec![vec![4], vec![5, 6]]),
         };
 
@@ -289,7 +366,7 @@ mod tests {
             depots: vec![1],
             capacity: Some(2),
             demands: Some(vec![0, 11, 12]),
-            node_coords: Some(vec![(0, 0), (7, 8), (9, 10)]),
+            node_coords: Some(vec![(0.0, 0.0), (7.0, 8.0), (9.0, 10.0)]),
             edge_weights: vec![vec![0, 4, 5], vec![4, 0, 6], vec![5, 6, 0]],
         };
         assert_eq!(value, expected);
@@ -305,13 +382,13 @@ mod tests {
             depots: vec![], // is empty
             capacity: Some(2),
             demands: Some(vec![0, 11, 12]),
-            node_coords: Some(vec![(0, 0), (7, 8), (9, 10)]),
+            node_coords: Some(vec![(0.0, 0.0), (7.0, 8.0), (9.0, 10.0)]),
             edge_weights: Some(vec![vec![4], vec![5, 6]]),
         };
 
         let value = sut.build().unwrap_err();
 
-        let expected = InstanceError::MissingDepots;
+        let expected = ValidationError::MissingDepots;
         assert_eq!(value, expected);
     }
 
@@ -325,13 +402,13 @@ mod tests {
             depots: vec![1],
             capacity: Some(2),
             demands: None, // not given
-            node_coords: Some(vec![(0, 0), (7, 8), (9, 10)]),
+            node_coords: Some(vec![(0.0, 0.0), (7.0, 8.0), (9.0, 10.0)]),
             edge_weights: Some(vec![vec![4], vec![5, 6]]),
         };
 
         let value = sut.build().unwrap_err();
 
-        let expected = InstanceError::MissingDemands;
+        let expected = ValidationError::MissingDemands;
         assert_eq!(value, expected);
     }
 
@@ -345,13 +422,13 @@ mod tests {
             depots: vec![1],
             capacity: None, // not given
             demands: Some(vec![0, 11, 12]),
-            node_coords: Some(vec![(0, 0), (7, 8), (9, 10)]),
+            node_coords: Some(vec![(0.0, 0.0), (7.0, 8.0), (9.0, 10.0)]),
             edge_weights: Some(vec![vec![4], vec![5, 6]]),
         };
 
         let value = sut.build().unwrap_err();
 
-        let expected = InstanceError::MissingCapacity;
+        let expected = ValidationError::MissingCapacity;
         assert_eq!(value, expected);
     }
 
@@ -363,15 +440,35 @@ mod tests {
             dimension: 3,
             edge_weight_kind: EdgeWeightKind::LowerRow,
             depots: vec![1],
-            capacity: None, // not given
+            capacity: None,
             demands: Some(vec![0, 11, 12]),
-            node_coords: Some(vec![(0, 0), (7, 8), (9, 10)]),
+            node_coords: Some(vec![(0.0, 0.0), (7.0, 8.0), (9.0, 10.0)]),
+            edge_weights: None, // not given
+        };
+
+        let value = sut.build().unwrap_err();
+
+        let expected = ValidationError::MissingEdgeWeight;
+        assert_eq!(value, expected);
+    }
+
+    #[test]
+    fn test_build_fails_if_missing_node_coords() {
+        let sut = VRPInstanceBuilder {
+            name: "This is a name.".to_string(),
+            problem_type: ProblemType::CVRP,
+            dimension: 3,
+            edge_weight_kind: EdgeWeightKind::Euc2D,
+            depots: vec![1],
+            capacity: None,
+            demands: Some(vec![0, 11, 12]),
+            node_coords: None, // not given
             edge_weights: None,
         };
 
         let value = sut.build().unwrap_err();
 
-        let expected = InstanceError::MissingEdgeWeight;
+        let expected = ValidationError::MissingNodeCoords;
         assert_eq!(value, expected);
     }
 }

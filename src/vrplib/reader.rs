@@ -2,30 +2,66 @@ use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
 
-use super::TokenParseError;
+use super::ParseError;
+use super::TokenError;
 use super::lexer::tokenize;
-use super::parser::FormatError;
 use super::parser::parse;
 use crate::VRPInstance;
 use crate::VRPInstanceBuilder;
-use crate::instance::InstanceError;
+use crate::instance::ValidationError;
 
+///
+/// Represents all possible errors that can occur while loading a VRPLib file.
+///
+/// This error type aggregates lower-level errors produced during the loading
+/// pipeline, including file I/O failures, tokenization errors, parsing errors,
+/// and validation errors encountered when constructing a `VRPInstance`.
+///
+/// Each variant corresponds to a specific stage of the loading process.
 #[derive(Debug, thiserror::Error)]
 pub enum LoadError {
-    #[error("I/O error: {0}")]
+    /// An underlying file I/O error occurred while reading the VRPLib file.
+    ///
+    /// This typically indicates that the file does not exist, cannot be opened,
+    /// or could not be read due to operating system–level issues.
+    #[error("i/o error: {0}")]
     Io(#[from] std::io::Error),
 
-    #[error("Token parse error: {0}")]
-    TokenParse(#[from] TokenParseError),
+    /// A tokenization error occurred while converting raw text into tokens.
+    ///
+    /// This variant is returned when the lexical analysis stage fails, such as
+    /// encountering an unexpected character or malformed token.
+    #[error("token error: {0}")]
+    Token(#[from] TokenError),
 
-    #[error("Format error: {0}")]
-    Format(#[from] FormatError),
+    /// A parsing error occurred while interpreting the tokenized input.
+    ///
+    /// This indicates that the VRPLib file contains syntactically invalid
+    /// structures or violates the expected VRPLib format.
+    #[error("parse error: {0}")]
+    Parse(#[from] ParseError),
 
-    #[error("Instance error: {0}")]
-    Build(#[from] InstanceError),
+    /// A validation error occurred while constructing a `VRPInstance`.
+    ///
+    /// This variant is returned when the parsed data is structurally correct
+    /// but fails semantic validation, such as invalid problem definitions.
+    #[error("validation error: {0}")]
+    Validation(#[from] ValidationError),
 }
 
-pub fn read_from_vrplib<P>(filename: P) -> Result<VRPInstance, LoadError>
+/// Loads a VRPLib file and constructs a `VRPInstance`.
+///
+/// # Errors
+/// - [`LoadError::Io`] if reading the file fails
+/// - [`LoadError::Token`] if tokenizing the VRPLib file fails
+/// - [`LoadError::Parse`] if parsing the VRPLib file fails
+/// - [`LoadError::Validation`] if instance validation fails
+/// # Examples
+/// ```no_run
+/// let instance = vrp_parser::read_from_vrplib("ORTEC-n242-k12.vrp").unwrap();
+/// assert_eq!(instance.dimension(), 242);
+/// ```
+pub fn read_from_vrplib<P>(filename: P) -> Result<VRPInstance<u64>, LoadError>
 where
     P: AsRef<Path>,
 {

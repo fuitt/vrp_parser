@@ -7,8 +7,9 @@ pub(crate) mod problem_type;
 pub(crate) mod reader;
 pub(crate) mod token;
 
-use edge_weight_format::{EdgeWeightFormat, EdgeWeightFormatParseError};
-use edge_weight_type::{EdgeWeightType, EdgeWeightTypeParseError};
-use node_coord_type::{NodeCoordType, NodeCoordTypeParseError};
-use problem_type::ProblemTypeParseError;
-use token::{Token, TokenParseError};
+use edge_weight_format::{EdgeWeightFormat, ParseEdgeWeightFormatError};
+use edge_weight_type::{EdgeWeightType, ParseEdgeWeightTypeError};
+use node_coord_type::{NodeCoordType, ParseNodeCoordTypeError};
+use parser::ParseError;
+use problem_type::ParseProblemTypeError;
+use token::{Token, TokenError};

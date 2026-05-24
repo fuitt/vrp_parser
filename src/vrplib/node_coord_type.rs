@@ -6,19 +6,19 @@ pub(crate) enum NodeCoordType {
 }
 
 #[derive(Debug, PartialEq, thiserror::Error)]
-pub enum NodeCoordTypeParseError {
-    #[error("Unknown node coordinate type: {0}")]
+pub enum ParseNodeCoordTypeError {
+    #[error("unknown node coordinate type: {0}")]
     UnknownType(String),
 }
 
 impl TryFrom<&str> for NodeCoordType {
-    type Error = NodeCoordTypeParseError;
+    type Error = ParseNodeCoordTypeError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         if value == "TWOD_COORDS" {
             return Ok(NodeCoordType::TwodCoords);
         }
-        Err(NodeCoordTypeParseError::UnknownType(value.to_string()))
+        Err(ParseNodeCoordTypeError::UnknownType(value.to_string()))
     }
 }
 
@@ -43,7 +43,7 @@ mod tests {
 
         assert_eq!(
             value,
-            NodeCoordTypeParseError::UnknownType("foo_node_coord".to_string())
+            ParseNodeCoordTypeError::UnknownType("foo_node_coord".to_string())
         );
     }
 }

@@ -3,19 +3,19 @@ use std::convert::TryFrom;
 use crate::ProblemType;
 
 #[derive(Debug, PartialEq, thiserror::Error)]
-pub enum ProblemTypeParseError {
-    #[error("Unknown problem type: {0}")]
+pub enum ParseProblemTypeError {
+    #[error("unknown problem type: {0}")]
     UnknownType(String),
 }
 
 impl TryFrom<&str> for ProblemType {
-    type Error = ProblemTypeParseError;
+    type Error = ParseProblemTypeError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         if value == "CVRP" {
             return Ok(ProblemType::CVRP);
         }
-        Err(ProblemTypeParseError::UnknownType(value.to_string()))
+        Err(ParseProblemTypeError::UnknownType(value.to_string()))
     }
 }
 
@@ -40,7 +40,7 @@ mod tests {
 
         assert_eq!(
             value,
-            ProblemTypeParseError::UnknownType("foo_vrp".to_string())
+            ParseProblemTypeError::UnknownType("foo_vrp".to_string())
         );
     }
 }

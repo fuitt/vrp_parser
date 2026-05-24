@@ -1,6 +1,6 @@
-pub(crate) fn expand_lower_row(lower_row: &[Vec<u64>]) -> Vec<Vec<u64>> {
+pub(crate) fn expand_lower_row<T: Default + Copy>(lower_row: &[Vec<T>]) -> Vec<Vec<T>> {
     let size = lower_row.len() + 1;
-    let mut ret = vec![vec![0u64; size]; size];
+    let mut ret = vec![vec![Default::default(); size]; size];
 
     for i in 0..ret.len() {
         for j in 0..ret[i].len() {

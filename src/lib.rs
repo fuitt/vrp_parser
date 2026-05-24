@@ -1,8 +1,21 @@
+//! # vrplib
+//!
+//! A library for loading VRPLib-formatted files and representing them as VRP instances.
+//!
+//! ## Features
+//! - Loading VRPLib files
+//! - Lexical and syntactic parsing
+//! - Instance validation
+//!
+//! ## Example
+//! ```no_run
+//! let instance = vrp_parser::read_from_vrplib("example.vrp").unwrap();
+//! ```
 pub(crate) mod common;
 pub(crate) mod instance;
 pub(crate) mod vrplib;
 
-pub use common::EdgeWeightKind;
+pub(crate) use common::EdgeWeightKind;
 pub use common::ProblemType;
 pub use instance::VRPInstance;
 pub(crate) use instance::VRPInstanceBuilder;
