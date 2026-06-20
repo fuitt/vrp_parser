@@ -268,12 +268,22 @@ impl<T> VRPInstance<T> {
         &self.node_coords
     }
 
+    /// Returns the coordinates for the given node, if coordinates are defined.
+    pub fn get_node_coord(&self, node: usize) -> Option<&(f64, f64)> {
+        self.node_coords.as_ref()?.get(node)
+    }
+
     /// Returns the demand value for each node, if applicable.
     ///
     /// This field is present for problem types that require customer demands,
     /// such as [`ProblemType::CVRP`]. For other problem types, it is `None`.
     pub fn demands(&self) -> &Option<Vec<T>> {
         &self.demands
+    }
+
+    /// Returns the demand for the given node, if demands are defined.
+    pub fn get_demand(&self, node: usize) -> Option<&T> {
+        self.demands.as_ref()?.get(node)
     }
 
     /// Returns the vehicle capacity, if defined for this instance.
@@ -301,6 +311,11 @@ impl<T> VRPInstance<T> {
     pub fn edge_weights(&self) -> &[Vec<T>] {
         &self.edge_weights
     }
+
+    /// Returns the edge weight between two nodes, or `None` if either index is out of bounds.
+    pub fn get_edge_weight(&self, from: usize, to: usize) -> Option<&T> {
+        self.edge_weights.get(from)?.get(to)
+    }
 }
 
 #[cfg(test)]
@@ -310,6 +325,117 @@ mod tests {
     use crate::vrplib::edge_weight_format::EdgeWeightFormat;
     use crate::vrplib::edge_weight_type::EdgeWeightType;
     use crate::vrplib::node_coord_type::NodeCoordType;
+
+    fn build_instance_with_edge_weights() -> VRPInstance<u64> {
+        VRPInstance {
+            name: "test".to_string(),
+            problem_type: ProblemType::CVRP,
+            dimension: 3,
+            depots: vec![0],
+            capacity: None,
+            demands: None,
+            node_coords: None,
+            edge_weights: vec![vec![0, 1, 2], vec![1, 0, 3], vec![2, 3, 0]],
+        }
+    }
+
+    #[test]
+    fn test_get_edge_weight_returns_weight_for_valid_nodes() {
+        let sut = build_instance_with_edge_weights();
+        assert_eq!(sut.get_edge_weight(0, 2), Some(&2));
+    }
+
+    #[test]
+    fn test_get_edge_weight_returns_none_for_out_of_bounds_from() {
+        let sut = build_instance_with_edge_weights();
+        assert_eq!(sut.get_edge_weight(99, 0), None);
+    }
+
+    #[test]
+    fn test_get_edge_weight_returns_none_for_out_of_bounds_to() {
+        let sut = build_instance_with_edge_weights();
+        assert_eq!(sut.get_edge_weight(0, 99), None);
+    }
+
+    fn build_instance_with_coords() -> VRPInstance<u64> {
+        VRPInstance {
+            name: "test".to_string(),
+            problem_type: ProblemType::CVRP,
+            dimension: 3,
+            depots: vec![0],
+            capacity: Some(10),
+            demands: Some(vec![0, 5, 8]),
+            node_coords: Some(vec![(1.0, 2.0), (3.0, 4.0), (5.0, 6.0)]),
+            edge_weights: vec![vec![0, 1, 2], vec![1, 0, 3], vec![2, 3, 0]],
+        }
+    }
+
+    #[test]
+    fn test_get_node_coord_returns_coord_for_valid_node() {
+        let sut = build_instance_with_coords();
+        assert_eq!(sut.get_node_coord(1), Some(&(3.0, 4.0)));
+    }
+
+    #[test]
+    fn test_get_node_coord_returns_none_for_out_of_bounds_node() {
+        let sut = build_instance_with_coords();
+        assert_eq!(sut.get_node_coord(99), None);
+    }
+
+    #[test]
+    fn test_get_node_coord_returns_none_when_coords_absent() {
+        let sut = VRPInstance::<u64> {
+            name: "test".to_string(),
+            problem_type: ProblemType::CVRP,
+            dimension: 3,
+            depots: vec![0],
+            capacity: None,
+            demands: None,
+            node_coords: None,
+            edge_weights: vec![vec![0, 1, 2], vec![1, 0, 3], vec![2, 3, 0]],
+        };
+        assert_eq!(sut.get_node_coord(0), None);
+    }
+
+    fn build_instance_with_demands() -> VRPInstance<u64> {
+        VRPInstance {
+            name: "test".to_string(),
+            problem_type: ProblemType::CVRP,
+            dimension: 3,
+            depots: vec![0],
+            capacity: Some(10),
+            demands: Some(vec![0, 5, 8]),
+            node_coords: None,
+            edge_weights: vec![vec![0, 1, 2], vec![1, 0, 3], vec![2, 3, 0]],
+        }
+    }
+
+    #[test]
+    fn test_get_demand_returns_demand_for_valid_node() {
+        let sut = build_instance_with_demands();
+        assert_eq!(sut.get_demand(1), Some(&5));
+    }
+
+    #[test]
+    fn test_get_demand_returns_none_for_out_of_bounds_node() {
+        let sut = build_instance_with_demands();
+        assert_eq!(sut.get_demand(99), None);
+    }
+
+    #[test]
+    fn test_get_demand_returns_none_when_demands_absent() {
+        let sut = VRPInstance {
+            name: "test".to_string(),
+            problem_type: ProblemType::CVRP,
+            dimension: 3,
+            depots: vec![0],
+            capacity: None,
+            demands: None,
+            node_coords: None,
+            edge_weights: vec![vec![0, 1, 2], vec![1, 0, 3], vec![2, 3, 0]],
+        };
+        assert_eq!(sut.get_demand(0), None);
+    }
 
     #[test]
     fn test_make_from_vrplib() {
