@@ -73,7 +73,37 @@ where
         tokens.push(tokenized);
     }
 
-    let parsed = parse(&tokens)?;
+    let parsed = parse::<u64>(&tokens)?;
+    let builder = VRPInstanceBuilder::make_from_vrplib(parsed);
+    let instance = builder.build()?;
+    Ok(instance)
+}
+
+/// Loads a VRPLib file and constructs a `VRPInstance<f64>`.
+///
+/// Identical to [`read_from_vrplib`] except that all numeric values
+/// (edge weights, demands, capacity) are represented as `f64`. Edge weights
+/// computed from coordinates are rounded to the nearest integer and then
+/// stored as `f64`.
+///
+/// # Errors
+/// - [`LoadError::Io`] if reading the file fails
+/// - [`LoadError::Token`] if tokenizing the VRPLib file fails
+/// - [`LoadError::Parse`] if parsing the VRPLib file fails
+/// - [`LoadError::Validation`] if instance validation fails
+pub fn read_from_vrplib_f64<P>(filename: P) -> Result<VRPInstance<f64>, LoadError>
+where
+    P: AsRef<Path>,
+{
+    let mut tokens = vec![];
+    let lines = read_lines(filename)?;
+    for line in lines {
+        let line = line?;
+        let tokenized = tokenize(&line)?;
+        tokens.push(tokenized);
+    }
+
+    let parsed = parse::<f64>(&tokens)?;
     let builder = VRPInstanceBuilder::make_from_vrplib(parsed);
     let instance = builder.build()?;
     Ok(instance)

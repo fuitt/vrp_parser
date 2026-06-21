@@ -6,6 +6,12 @@ pub(crate) fn edge_weight_by_euc2d(p: (f64, f64), q: (f64, f64)) -> u64 {
     nint((dx * dx + dy * dy).sqrt())
 }
 
+pub(crate) fn edge_weight_by_euc2d_f64(p: (f64, f64), q: (f64, f64)) -> f64 {
+    let dx = p.0 - q.0;
+    let dy = p.1 - q.1;
+    nint((dx * dx + dy * dy).sqrt()) as f64
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

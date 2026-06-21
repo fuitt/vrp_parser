@@ -1,3 +1,4 @@
+use crate::Numeric;
 use crate::ProblemType;
 
 use super::NodeCoordType;
@@ -14,17 +15,17 @@ enum State {
 }
 
 #[derive(Debug, Default, PartialEq)]
-pub(crate) struct SectionData {
+pub(crate) struct SectionData<T> {
     pub name: Option<String>,
     pub problem_type: Option<ProblemType>,
     pub dimension: Option<usize>,
-    pub capacity: Option<u64>,
+    pub capacity: Option<T>,
     pub edge_weight_type: Option<EdgeWeightType>,
     pub edge_weight_format: Option<EdgeWeightFormat>,
-    pub edge_weights: Vec<Vec<u64>>,
+    pub edge_weights: Vec<Vec<T>>,
     pub node_coord_type: Option<NodeCoordType>,
     pub node_coords: Vec<Vec<f64>>,
-    pub demands: Vec<Vec<u64>>,
+    pub demands: Vec<Vec<T>>,
     pub depots: Vec<Vec<usize>>,
 }
 
@@ -61,13 +62,13 @@ pub enum ParseError {
     Depot,
 }
 
-pub(crate) fn parse(tokens: &[Token]) -> Result<SectionData, ParseError> {
+pub(crate) fn parse<T: Numeric>(tokens: &[Token]) -> Result<SectionData<T>, ParseError> {
     let section_data = parse_tokens(tokens)?;
     validate_format(&section_data)?;
     Ok(section_data)
 }
 
-fn parse_tokens(tokens: &[Token]) -> Result<SectionData, ParseError> {
+fn parse_tokens<T: Numeric>(tokens: &[Token]) -> Result<SectionData<T>, ParseError> {
     let mut data = SectionData::default();
 
     let mut state = State::Header;
@@ -78,7 +79,7 @@ fn parse_tokens(tokens: &[Token]) -> Result<SectionData, ParseError> {
             Token::Comment(_) => {}
             Token::Type(t) => data.problem_type = Some(*t),
             Token::Dimension(d) => data.dimension = Some(*d),
-            Token::Capacity(c) => data.capacity = Some(*c),
+            Token::Capacity(c) => data.capacity = Some(T::from_u64(*c)),
             Token::EdgeWeightType(t) => data.edge_weight_type = Some(*t),
             Token::EdgeWeightFormat(f) => data.edge_weight_format = Some(*f),
             Token::NodeCoordType(t) => data.node_coord_type = Some(*t),
@@ -89,14 +90,8 @@ fn parse_tokens(tokens: &[Token]) -> Result<SectionData, ParseError> {
             Token::Data(d) => match state {
                 State::Header => {}
                 State::EdgeWeightSection => {
-                    let weights = d
-                        .iter()
-                        .map(|x| x.parse::<u64>())
-                        .collect::<Result<Vec<_>, _>>();
-                    match weights {
-                        Ok(_) => {
-                            data.edge_weights.push(weights.unwrap());
-                        }
+                    match d.iter().map(|x| x.parse::<T>()).collect::<Result<Vec<_>, _>>() {
+                        Ok(weights) => data.edge_weights.push(weights),
                         Err(_) => return Err(ParseError::EdgeWeight),
                     }
                 }
@@ -104,44 +99,26 @@ fn parse_tokens(tokens: &[Token]) -> Result<SectionData, ParseError> {
                     if d.is_empty() {
                         return Err(ParseError::NodeCoord);
                     } else {
-                        let d0 = d[0].parse::<usize>();
-                        match d0 {
-                            Ok(val) => {
-                                if val != node_coord_index {
-                                    return Err(ParseError::NodeCoord);
-                                }
-                            }
-                            Err(_) => return Err(ParseError::NodeCoord),
+                        match d[0].parse::<usize>() {
+                            Ok(val) if val == node_coord_index => {}
+                            _ => return Err(ParseError::NodeCoord),
                         }
-                        let node_coords: Result<_, _> =
-                            d[1..].iter().map(|x| x.parse::<f64>()).collect();
-                        match node_coords {
-                            Ok(_) => {
-                                data.node_coords.push(node_coords.unwrap());
-                            }
+                        match d[1..].iter().map(|x| x.parse::<f64>()).collect::<Result<Vec<_>, _>>() {
+                            Ok(coords) => data.node_coords.push(coords),
                             Err(_) => return Err(ParseError::NodeCoord),
                         }
                         node_coord_index += 1;
                     }
                 }
                 State::DemandSection => {
-                    let demands = d
-                        .iter()
-                        .map(|x| x.parse::<u64>())
-                        .collect::<Result<Vec<_>, _>>();
-                    match demands {
-                        Ok(_) => {
-                            data.demands.push(demands.unwrap());
-                        }
+                    match d.iter().map(|x| x.parse::<T>()).collect::<Result<Vec<_>, _>>() {
+                        Ok(demands) => data.demands.push(demands),
                         Err(_) => return Err(ParseError::Demand),
                     }
                 }
                 State::DepotSection => {
-                    let depots: Result<_, _> = d.iter().map(|x| x.parse::<usize>()).collect();
-                    match depots {
-                        Ok(_) => {
-                            data.depots.push(depots.unwrap());
-                        }
+                    match d.iter().map(|x| x.parse::<usize>()).collect::<Result<Vec<_>, _>>() {
+                        Ok(depots) => data.depots.push(depots),
                         Err(_) => return Err(ParseError::Depot),
                     }
                 }
@@ -152,7 +129,7 @@ fn parse_tokens(tokens: &[Token]) -> Result<SectionData, ParseError> {
     Ok(data)
 }
 
-fn validate_format(section_data: &SectionData) -> Result<(), ParseError> {
+fn validate_format<T: Numeric>(section_data: &SectionData<T>) -> Result<(), ParseError> {
     section_data.name.as_ref().ok_or(ParseError::MissingName)?;
     section_data
         .problem_type
@@ -187,11 +164,11 @@ fn validate_format(section_data: &SectionData) -> Result<(), ParseError> {
     Ok(())
 }
 
-fn validate_edge_weights(
+fn validate_edge_weights<T>(
     dimension: usize,
     edge_weight_type: EdgeWeightType,
     edge_weight_format: Option<EdgeWeightFormat>,
-    edge_weights: &[Vec<u64>],
+    edge_weights: &[Vec<T>],
 ) -> Result<(), ParseError> {
     match edge_weight_type {
         EdgeWeightType::Explicit => {
@@ -257,12 +234,12 @@ fn is_2d_coords(dimension: usize, node_coords: &[Vec<f64>]) -> bool {
     dimension == node_coords.len() && node_coords.iter().all(|coords| coords.len() == 2)
 }
 
-fn validate_demands(dimension: usize, demands: &[Vec<u64>]) -> Result<(), ParseError> {
+fn validate_demands<T: Numeric>(dimension: usize, demands: &[Vec<T>]) -> Result<(), ParseError> {
     if dimension == demands.len()
         && demands
             .iter()
             .enumerate()
-            .all(|(i, demand)| demand.len() == 2 && i + 1 == (demand[0] as usize))
+            .all(|(i, demand)| demand.len() == 2 && i + 1 == demand[0].as_usize())
     {
         Ok(())
     } else {
@@ -312,9 +289,9 @@ mod tests {
             Token::Data(vec!["1".to_string()]),
         ];
 
-        let value = parse_tokens(&sut).unwrap();
+        let value: SectionData<u64> = parse_tokens(&sut).unwrap();
 
-        let expected = SectionData {
+        let expected = SectionData::<u64> {
             name: Some("This is a name.".to_string()),
             problem_type: Some(ProblemType::CVRP),
             dimension: Some(3),
@@ -356,7 +333,8 @@ mod tests {
             Token::Data(vec!["1".to_string()]),
         ];
 
-        let value = parse_tokens(&sut).unwrap_err();
+        let value: Result<SectionData<u64>, _> = parse_tokens(&sut);
+        let value = value.unwrap_err();
 
         let expected = ParseError::EdgeWeight;
         assert_eq!(value, expected);
@@ -388,7 +366,8 @@ mod tests {
             Token::Data(vec!["1".to_string()]),
         ];
 
-        let value = parse_tokens(&sut).unwrap_err();
+        let value: Result<SectionData<u64>, _> = parse_tokens(&sut);
+        let value = value.unwrap_err();
 
         let expected = ParseError::NodeCoord;
         assert_eq!(value, expected);
@@ -420,7 +399,8 @@ mod tests {
             Token::Data(vec!["1".to_string()]),
         ];
 
-        let value = parse_tokens(&sut).unwrap_err();
+        let value: Result<SectionData<u64>, _> = parse_tokens(&sut);
+        let value = value.unwrap_err();
 
         let expected = ParseError::Demand;
         assert_eq!(value, expected);
@@ -452,7 +432,8 @@ mod tests {
             Token::Data(vec!["A1".to_string()]), // not a number
         ];
 
-        let value = parse_tokens(&sut).unwrap_err();
+        let value: Result<SectionData<u64>, _> = parse_tokens(&sut);
+        let value = value.unwrap_err();
 
         let expected = ParseError::Depot;
         assert_eq!(value, expected);
@@ -460,7 +441,7 @@ mod tests {
 
     #[test]
     fn test_validate_format_succeeds() {
-        let sut = SectionData {
+        let sut = SectionData::<u64> {
             name: Some("This is a name.".to_string()),
             problem_type: Some(ProblemType::CVRP),
             dimension: Some(3),
@@ -482,7 +463,7 @@ mod tests {
 
     #[test]
     fn test_validate_format_fails_if_missing_name() {
-        let sut = SectionData {
+        let sut = SectionData::<u64> {
             name: None,
             problem_type: Some(ProblemType::CVRP),
             dimension: Some(3),
@@ -504,7 +485,7 @@ mod tests {
 
     #[test]
     fn test_validate_format_fails_if_missing_problem_type() {
-        let sut = SectionData {
+        let sut = SectionData::<u64> {
             name: Some("This is a name.".to_string()),
             problem_type: None,
             dimension: Some(3),
@@ -526,7 +507,7 @@ mod tests {
 
     #[test]
     fn test_validate_format_fails_if_missing_dimension() {
-        let sut = SectionData {
+        let sut = SectionData::<u64> {
             name: Some("This is a name.".to_string()),
             problem_type: Some(ProblemType::CVRP),
             dimension: None,
@@ -548,7 +529,7 @@ mod tests {
 
     #[test]
     fn test_validate_format_fails_if_missing_edge_weight_type() {
-        let sut = SectionData {
+        let sut = SectionData::<u64> {
             name: Some("This is a name.".to_string()),
             problem_type: Some(ProblemType::CVRP),
             dimension: Some(3),
@@ -570,7 +551,7 @@ mod tests {
 
     #[test]
     fn test_validate_format_fails_if_missing_edge_weight_format() {
-        let sut = SectionData {
+        let sut = SectionData::<u64> {
             name: Some("This is a name.".to_string()),
             problem_type: Some(ProblemType::CVRP),
             dimension: Some(3),
@@ -592,7 +573,7 @@ mod tests {
 
     #[test]
     fn test_validate_format_fails_if_edge_weights_are_invalid() {
-        let sut = SectionData {
+        let sut = SectionData::<u64> {
             name: Some("This is a name.".to_string()),
             problem_type: Some(ProblemType::CVRP),
             dimension: Some(3),
@@ -614,7 +595,7 @@ mod tests {
 
     #[test]
     fn test_validate_format_fails_if_node_coords_are_invalid() {
-        let sut = SectionData {
+        let sut = SectionData::<u64> {
             name: Some("This is a name.".to_string()),
             problem_type: Some(ProblemType::CVRP),
             dimension: Some(3),
@@ -640,7 +621,7 @@ mod tests {
 
     #[test]
     fn test_validate_format_fails_if_node_coords_type_not_given() {
-        let sut = SectionData {
+        let sut = SectionData::<u64> {
             name: Some("This is a name.".to_string()),
             problem_type: Some(ProblemType::CVRP),
             dimension: Some(3),
@@ -662,7 +643,7 @@ mod tests {
 
     #[test]
     fn test_validate_format_fails_if_node_coords_are_invalid_euc2d() {
-        let sut = SectionData {
+        let sut = SectionData::<u64> {
             name: Some("This is a name.".to_string()),
             problem_type: Some(ProblemType::CVRP),
             dimension: Some(3),
@@ -688,7 +669,7 @@ mod tests {
 
     #[test]
     fn test_validate_format_fails_if_demands_are_invalid() {
-        let sut = SectionData {
+        let sut = SectionData::<u64> {
             name: Some("This is a name.".to_string()),
             problem_type: Some(ProblemType::CVRP),
             dimension: Some(3),
@@ -710,7 +691,7 @@ mod tests {
 
     #[test]
     fn test_validate_format_fails_if_depots_are_invalid() {
-        let sut = SectionData {
+        let sut = SectionData::<u64> {
             name: Some("This is a name.".to_string()),
             problem_type: Some(ProblemType::CVRP),
             dimension: Some(3),

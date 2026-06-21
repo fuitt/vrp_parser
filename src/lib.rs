@@ -16,8 +16,10 @@ pub(crate) mod instance;
 pub(crate) mod vrplib;
 
 pub(crate) use common::EdgeWeightKind;
+pub(crate) use common::Numeric;
 pub use common::ProblemType;
 pub use instance::VRPInstance;
 pub(crate) use instance::VRPInstanceBuilder;
 pub use vrplib::reader::LoadError;
 pub use vrplib::reader::read_from_vrplib;
+pub use vrplib::reader::read_from_vrplib_f64;
