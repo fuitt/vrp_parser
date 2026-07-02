@@ -4,7 +4,11 @@ Loads VRPLib-formatted files and constructs `VRPInstance` values.
 
 ## Example
 ```rust
+// Load with integer (u64) numeric values
 let instance = vrp_parser::read_from_vrplib("example.vrp")?;
+
+// Load with floating-point (f64) numeric values
+let instance = vrp_parser::read_from_vrplib_f64("example.vrp")?;
 ```
 
 ## Installation
@@ -13,7 +17,7 @@ vrp_parser = "0.1"
 ```
 
 ## Status
-This is an early release (v0.1.0).
+This is an early release (v0.1.1).
 
 Currently supported VRPLib sections:
 - NAME
@@ -30,6 +34,16 @@ Currently supported VRPLib sections:
 - DEPOT_SECTION
 
 ## License
-Licensed under either of Apache License, Version 2.0 or MIT license at your option.
 
-Unless stated otherwise, contributions are dual licensed under the same terms.
+Licensed under either of
+
+ * Apache License, Version 2.0
+ * MIT license
+
+at your option.
+
+## Contribution
+
+Unless you explicitly state otherwise, any contribution intentionally submitted
+for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
+dual licensed as above, without any additional terms or conditions.
