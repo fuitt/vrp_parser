@@ -396,11 +396,7 @@ mod tests {
             capacity: None,
             demands: None,
             node_coords: None,
-            edge_weights: vec![
-                vec![0, 1, 2],
-                vec![1, 0, 3],
-                vec![2, 3, 0],
-            ],
+            edge_weights: vec![vec![0, 1, 2], vec![1, 0, 3], vec![2, 3, 0]],
         }
     }
 
@@ -431,11 +427,7 @@ mod tests {
             capacity: Some(10),
             demands: Some(vec![0, 5, 8]),
             node_coords: Some(vec![(1.0, 2.0), (3.0, 4.0), (5.0, 6.0)]),
-            edge_weights: vec![
-                vec![0, 1, 2],
-                vec![1, 0, 3],
-                vec![2, 3, 0],
-            ],
+            edge_weights: vec![vec![0, 1, 2], vec![1, 0, 3], vec![2, 3, 0]],
         }
     }
 
@@ -461,11 +453,7 @@ mod tests {
             capacity: None,
             demands: None,
             node_coords: None,
-            edge_weights: vec![
-                vec![0, 1, 2],
-                vec![1, 0, 3],
-                vec![2, 3, 0],
-            ],
+            edge_weights: vec![vec![0, 1, 2], vec![1, 0, 3], vec![2, 3, 0]],
         };
         assert_eq!(sut.get_node_coord(0), None);
     }
@@ -479,11 +467,7 @@ mod tests {
             capacity: Some(10),
             demands: Some(vec![0, 5, 8]),
             node_coords: None,
-            edge_weights: vec![
-                vec![0, 1, 2],
-                vec![1, 0, 3],
-                vec![2, 3, 0],
-            ],
+            edge_weights: vec![vec![0, 1, 2], vec![1, 0, 3], vec![2, 3, 0]],
         }
     }
 
@@ -509,11 +493,7 @@ mod tests {
             capacity: None,
             demands: None,
             node_coords: None,
-            edge_weights: vec![
-                vec![0u64, 1, 2],
-                vec![1, 0, 3],
-                vec![2, 3, 0],
-            ],
+            edge_weights: vec![vec![0u64, 1, 2], vec![1, 0, 3], vec![2, 3, 0]],
         };
         assert_eq!(sut.get_demand(0), None);
     }
@@ -703,7 +683,11 @@ mod tests {
             capacity: Some(2.0f64),
             demands: Some(vec![0.0, 11.0, 12.0]),
             node_coords: Some(vec![(0.0, 0.0), (7.0, 8.0), (9.0, 10.0)]),
-            edge_weights: vec![vec![0.0, 4.0, 5.0], vec![4.0, 0.0, 6.0], vec![5.0, 6.0, 0.0]],
+            edge_weights: vec![
+                vec![0.0, 4.0, 5.0],
+                vec![4.0, 0.0, 6.0],
+                vec![5.0, 6.0, 0.0],
+            ],
         };
         assert_eq!(value, expected);
     }

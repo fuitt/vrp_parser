@@ -90,7 +90,11 @@ fn parse_tokens<T: Numeric>(tokens: &[Token]) -> Result<SectionData<T>, ParseErr
             Token::Data(d) => match state {
                 State::Header => {}
                 State::EdgeWeightSection => {
-                    match d.iter().map(|x| x.parse::<T>()).collect::<Result<Vec<_>, _>>() {
+                    match d
+                        .iter()
+                        .map(|x| x.parse::<T>())
+                        .collect::<Result<Vec<_>, _>>()
+                    {
                         Ok(weights) => data.edge_weights.push(weights),
                         Err(_) => return Err(ParseError::EdgeWeight),
                     }
@@ -103,7 +107,11 @@ fn parse_tokens<T: Numeric>(tokens: &[Token]) -> Result<SectionData<T>, ParseErr
                             Ok(val) if val == node_coord_index => {}
                             _ => return Err(ParseError::NodeCoord),
                         }
-                        match d[1..].iter().map(|x| x.parse::<f64>()).collect::<Result<Vec<_>, _>>() {
+                        match d[1..]
+                            .iter()
+                            .map(|x| x.parse::<f64>())
+                            .collect::<Result<Vec<_>, _>>()
+                        {
                             Ok(coords) => data.node_coords.push(coords),
                             Err(_) => return Err(ParseError::NodeCoord),
                         }
@@ -111,13 +119,21 @@ fn parse_tokens<T: Numeric>(tokens: &[Token]) -> Result<SectionData<T>, ParseErr
                     }
                 }
                 State::DemandSection => {
-                    match d.iter().map(|x| x.parse::<T>()).collect::<Result<Vec<_>, _>>() {
+                    match d
+                        .iter()
+                        .map(|x| x.parse::<T>())
+                        .collect::<Result<Vec<_>, _>>()
+                    {
                         Ok(demands) => data.demands.push(demands),
                         Err(_) => return Err(ParseError::Demand),
                     }
                 }
                 State::DepotSection => {
-                    match d.iter().map(|x| x.parse::<usize>()).collect::<Result<Vec<_>, _>>() {
+                    match d
+                        .iter()
+                        .map(|x| x.parse::<usize>())
+                        .collect::<Result<Vec<_>, _>>()
+                    {
                         Ok(depots) => data.depots.push(depots),
                         Err(_) => return Err(ParseError::Depot),
                     }

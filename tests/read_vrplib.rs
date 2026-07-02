@@ -65,7 +65,11 @@ fn test_read_from_vrplib_f64_succeeds() {
     );
     assert_eq!(
         sut.edge_weights(),
-        &[vec![0.0, 4.0, 5.0], vec![4.0, 0.0, 6.0], vec![5.0, 6.0, 0.0]]
+        &[
+            vec![0.0, 4.0, 5.0],
+            vec![4.0, 0.0, 6.0],
+            vec![5.0, 6.0, 0.0]
+        ]
     );
 }
 
@@ -88,7 +92,11 @@ fn test_read_from_vrplib_f64_euc2d() {
     );
     assert_eq!(
         sut.edge_weights(),
-        &[vec![0.0, 11.0, 13.0], vec![11.0, 0.0, 3.0], vec![13.0, 3.0, 0.0]]
+        &[
+            vec![0.0, 11.0, 13.0],
+            vec![11.0, 0.0, 3.0],
+            vec![13.0, 3.0, 0.0]
+        ]
     );
 }
 
