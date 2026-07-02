@@ -1,6 +1,6 @@
 [package]
 name = "vrp_parser"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 description = "A library for parsing VRPLib-formatted files."
 license = "MIT OR Apache-2.0"
