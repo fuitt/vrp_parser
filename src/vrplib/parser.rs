@@ -2,9 +2,9 @@ use crate::Numeric;
 use crate::ProblemType;
 
 use super::Token;
-use super::edge_weight_format::EdgeWeightFormat;
-use super::edge_weight_type::EdgeWeightType;
-use super::node_coord_type::NodeCoordType;
+use super::types::edge_weight_format::EdgeWeightFormat;
+use super::types::edge_weight_type::EdgeWeightType;
+use super::types::node_coord_type::NodeCoordType;
 
 enum State {
     Header,

@@ -1,5 +1,5 @@
-use crate::vrplib::edge_weight_format::EdgeWeightFormat;
-use crate::vrplib::edge_weight_type::EdgeWeightType;
+use crate::vrplib::types::edge_weight_format::EdgeWeightFormat;
+use crate::vrplib::types::edge_weight_type::EdgeWeightType;
 
 /// Represents the unified edge‑weight representation used by this library.
 ///

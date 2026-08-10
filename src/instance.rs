@@ -387,9 +387,9 @@ impl<T> VrpInstance<T> {
 mod tests {
 
     use super::*;
-    use crate::vrplib::edge_weight_format::EdgeWeightFormat;
-    use crate::vrplib::edge_weight_type::EdgeWeightType;
-    use crate::vrplib::node_coord_type::NodeCoordType;
+    use crate::vrplib::types::edge_weight_format::EdgeWeightFormat;
+    use crate::vrplib::types::edge_weight_type::EdgeWeightType;
+    use crate::vrplib::types::node_coord_type::NodeCoordType;
 
     fn build_instance_with_edge_weights() -> VrpInstance<u64> {
         VrpInstance {
