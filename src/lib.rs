@@ -11,16 +11,17 @@
 //! ```no_run
 //! let instance = vrp_parser::read_from_vrplib("example.vrp").unwrap();
 //! ```
-pub(crate) mod common;
 pub(crate) mod error;
 pub(crate) mod instance;
+pub(crate) mod model;
+pub(crate) mod util;
 pub(crate) mod vrplib;
 
-pub(crate) use common::EdgeWeightKind;
-pub(crate) use common::Numeric;
-pub use common::ProblemType;
 pub use error::LoadError;
 pub use instance::VrpInstance;
 pub(crate) use instance::VrpInstanceBuilder;
+pub(crate) use model::EdgeWeightKind;
+pub use model::ProblemType;
+pub(crate) use util::Numeric;
 pub use vrplib::reader::read_from_vrplib;
 pub use vrplib::reader::read_from_vrplib_f64;

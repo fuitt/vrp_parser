@@ -1,4 +1,4 @@
-use crate::common::round::nint;
+use super::round::nint;
 
 pub(crate) fn edge_weight_by_euc2d(p: (f64, f64), q: (f64, f64)) -> u64 {
     let dx = p.0 - q.0;

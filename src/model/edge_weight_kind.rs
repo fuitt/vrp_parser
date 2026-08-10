@@ -18,10 +18,10 @@ use crate::vrplib::edge_weight_type::EdgeWeightType;
 /// Currently, only the `LowerRow` and `Euc2D` format is supported.
 ///
 /// - `LowerRow`: The lower triangular part of a symmetric matrix is listed
-///   row by row, excluding the diagonal. This corresponds to VRPLib’s
+///   row by row, excluding the diagonal. This corresponds to VRPLib's
 ///   `EDGE_WEIGHT_FORMAT = LOWER_ROW` when used with `EDGE_WEIGHT_TYPE = EXPLICIT`.
 /// - `Euc2D`: The edge weights are computed as the Euclidean distance between
-///   2D coordinates. This corresponds to VRPLib’s `EDGE_WEIGHT_TYPE = EUC_2D` with no
+///   2D coordinates. This corresponds to VRPLib's `EDGE_WEIGHT_TYPE = EUC_2D` with no
 ///   `EDGE_WEIGHT_FORMAT`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum EdgeWeightKind {

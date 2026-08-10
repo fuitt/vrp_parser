@@ -1,8 +1,8 @@
 use crate::EdgeWeightKind;
 use crate::Numeric;
 use crate::ProblemType;
-use crate::common::edge_weight::{edge_weight_by_euc2d, edge_weight_by_euc2d_f64};
-use crate::common::matrix::expand_lower_row;
+use crate::util::edge_weight::{edge_weight_by_euc2d, edge_weight_by_euc2d_f64};
+use crate::util::matrix::expand_lower_row;
 use crate::vrplib::parser::SectionData;
 
 #[derive(Debug, Clone, PartialEq)]
