@@ -166,7 +166,7 @@ impl<T: Numeric> VRPInstanceBuilder<T> {
 }
 
 impl VRPInstanceBuilder<u64> {
-    pub fn build(self) -> Result<VRPInstance<u64>, ValidationError> {
+    pub fn build(mut self) -> Result<VRPInstance<u64>, ValidationError> {
         let edge_weights = match self.edge_weight_kind {
             EdgeWeightKind::LowerRow => {
                 self.edge_weights
@@ -174,6 +174,10 @@ impl VRPInstanceBuilder<u64> {
                     .ok_or(ValidationError::MissingEdgeWeight)?;
                 expand_lower_row(self.edge_weights.as_ref().unwrap())
             }
+            EdgeWeightKind::FullMatrix => self
+                .edge_weights
+                .take()
+                .ok_or(ValidationError::MissingEdgeWeight)?,
             EdgeWeightKind::Euc2D => self
                 .node_coords
                 .as_ref()
@@ -221,7 +225,7 @@ impl VRPInstanceBuilder<u64> {
 }
 
 impl VRPInstanceBuilder<f64> {
-    pub fn build(self) -> Result<VRPInstance<f64>, ValidationError> {
+    pub fn build(mut self) -> Result<VRPInstance<f64>, ValidationError> {
         let edge_weights = match self.edge_weight_kind {
             EdgeWeightKind::LowerRow => {
                 self.edge_weights
@@ -229,6 +233,10 @@ impl VRPInstanceBuilder<f64> {
                     .ok_or(ValidationError::MissingEdgeWeight)?;
                 expand_lower_row(self.edge_weights.as_ref().unwrap())
             }
+            EdgeWeightKind::FullMatrix => self
+                .edge_weights
+                .take()
+                .ok_or(ValidationError::MissingEdgeWeight)?,
             EdgeWeightKind::Euc2D => self
                 .node_coords
                 .as_ref()

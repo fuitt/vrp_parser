@@ -250,6 +250,17 @@ fn validate_edge_weights<T>(
                             Err(ParseError::EdgeWeight)
                         }
                     }
+                    EdgeWeightFormat::FullMatrix => {
+                        if dimension == edge_weights.len()
+                            && edge_weights
+                                .iter()
+                                .all(|weights| dimension == weights.len())
+                        {
+                            Ok(())
+                        } else {
+                            Err(ParseError::EdgeWeight)
+                        }
+                    }
                 }
             } else {
                 Err(ParseError::MissingEdgeWeightFormat)
@@ -721,6 +732,48 @@ mod tests {
 
         let expected = Err(ParseError::NodeCoord);
         assert_eq!(value, expected);
+    }
+
+    #[test]
+    fn test_validate_format_succeeds_full_matrix() {
+        let sut = SectionData::<u64> {
+            name: Some("This is a name.".to_string()),
+            problem_type: Some(ProblemType::CVRP),
+            dimension: Some(3),
+            edge_weight_type: Some(EdgeWeightType::Explicit),
+            edge_weight_format: Some(EdgeWeightFormat::FullMatrix),
+            node_coord_type: Some(NodeCoordType::TwodCoords),
+            capacity: Some(2),
+            edge_weights: vec![vec![0, 4, 5], vec![4, 0, 6], vec![5, 6, 0]],
+            node_coords: vec![vec![0.0, 0.0], vec![7.0, 8.0], vec![9.0, 10.0]],
+            demands: vec![0, 11, 12],
+            depots: vec![1],
+        };
+
+        let value = validate_format(&sut);
+
+        assert_eq!(value, Ok(()));
+    }
+
+    #[test]
+    fn test_validate_format_fails_if_full_matrix_edge_weights_are_invalid() {
+        let sut = SectionData::<u64> {
+            name: Some("This is a name.".to_string()),
+            problem_type: Some(ProblemType::CVRP),
+            dimension: Some(3),
+            edge_weight_type: Some(EdgeWeightType::Explicit),
+            edge_weight_format: Some(EdgeWeightFormat::FullMatrix),
+            node_coord_type: Some(NodeCoordType::TwodCoords),
+            capacity: Some(2),
+            edge_weights: vec![vec![0, 4, 5], vec![4, 0, 6]], // missing one row
+            node_coords: vec![vec![0.0, 0.0], vec![7.0, 8.0], vec![9.0, 10.0]],
+            demands: vec![0, 11, 12],
+            depots: vec![1],
+        };
+
+        let value = validate_format(&sut);
+
+        assert_eq!(value, Err(ParseError::EdgeWeight));
     }
 
     #[test]

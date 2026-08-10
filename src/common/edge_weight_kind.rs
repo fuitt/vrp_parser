@@ -26,6 +26,7 @@ use crate::vrplib::edge_weight_type::EdgeWeightType;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum EdgeWeightKind {
     LowerRow,
+    FullMatrix,
     Euc2D,
 }
 
@@ -39,6 +40,7 @@ impl EdgeWeightKind {
                 if let Some(fmt) = edge_weight_format {
                     match fmt {
                         EdgeWeightFormat::LowerRow => return Some(EdgeWeightKind::LowerRow),
+                        EdgeWeightFormat::FullMatrix => return Some(EdgeWeightKind::FullMatrix),
                     }
                 }
             }
