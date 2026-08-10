@@ -134,12 +134,8 @@ impl<T: Numeric> VRPInstanceBuilder<T> {
             section_data.edge_weight_format,
         )
         .unwrap();
-        let depots = section_data.depots.iter().map(|depot| depot[0]).collect();
-        let demands = section_data
-            .demands
-            .iter()
-            .map(|demand| demand[1])
-            .collect();
+        let depots = section_data.depots;
+        let demands = section_data.demands;
         let node_coords = section_data
             .node_coords
             .iter()
@@ -510,8 +506,8 @@ mod tests {
             capacity: Some(2),
             edge_weights: vec![vec![4], vec![5, 6]],
             node_coords: vec![vec![0.0, 0.0], vec![7.0, 8.0], vec![9.0, 10.0]],
-            demands: vec![vec![1, 0], vec![2, 11], vec![3, 12]],
-            depots: vec![vec![1]],
+            demands: vec![0, 11, 12],
+            depots: vec![1],
         };
 
         let value = VRPInstanceBuilder::make_from_vrplib(sut);
