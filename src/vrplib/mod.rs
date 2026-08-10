@@ -7,5 +7,4 @@ pub(crate) mod problem_type;
 pub(crate) mod reader;
 pub(crate) mod token;
 
-use parser::ParseError;
 use token::{Token, TokenError};
