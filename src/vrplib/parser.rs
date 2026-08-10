@@ -102,12 +102,13 @@ fn parse_tokens<T: Numeric>(tokens: &[Token]) -> Result<SectionData<T>, ParseErr
                 );
             }
             Token::Dimension(s) => {
-                data.dimension =
-                    Some(s.parse::<usize>().map_err(|_| ParseError::InvalidDimension)?);
+                data.dimension = Some(
+                    s.parse::<usize>()
+                        .map_err(|_| ParseError::InvalidDimension)?,
+                );
             }
             Token::Capacity(s) => {
-                data.capacity =
-                    Some(s.parse::<T>().map_err(|_| ParseError::InvalidCapacity)?);
+                data.capacity = Some(s.parse::<T>().map_err(|_| ParseError::InvalidCapacity)?);
             }
             Token::EdgeWeightType(s) => {
                 data.edge_weight_type = Some(

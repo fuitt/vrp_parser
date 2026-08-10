@@ -47,7 +47,10 @@ mod tests {
     fn test_parse_comment() {
         let s = "COMMENT : This is a test instance. \n";
         let value = tokenize(s).unwrap();
-        assert_eq!(value, Token::Comment("This is a test instance.".to_string()));
+        assert_eq!(
+            value,
+            Token::Comment("This is a test instance.".to_string())
+        );
     }
 
     #[test]
