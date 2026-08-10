@@ -13,7 +13,7 @@ impl TryFrom<&str> for ProblemType {
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         if value == "CVRP" {
-            return Ok(ProblemType::CVRP);
+            return Ok(ProblemType::Cvrp);
         }
         Err(ParseProblemTypeError::UnknownType(value.to_string()))
     }
@@ -29,7 +29,7 @@ mod tests {
 
         let value = ProblemType::try_from(s).unwrap();
 
-        assert_eq!(value, ProblemType::CVRP);
+        assert_eq!(value, ProblemType::Cvrp);
     }
 
     #[test]

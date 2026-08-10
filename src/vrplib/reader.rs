@@ -6,8 +6,8 @@ use super::ParseError;
 use super::TokenError;
 use super::lexer::tokenize;
 use super::parser::parse;
-use crate::VRPInstance;
-use crate::VRPInstanceBuilder;
+use crate::VrpInstance;
+use crate::VrpInstanceBuilder;
 use crate::instance::ValidationError;
 
 ///
@@ -15,7 +15,7 @@ use crate::instance::ValidationError;
 ///
 /// This error type aggregates lower-level errors produced during the loading
 /// pipeline, including file I/O failures, tokenization errors, parsing errors,
-/// and validation errors encountered when constructing a `VRPInstance`.
+/// and validation errors encountered when constructing a `VrpInstance`.
 ///
 /// Each variant corresponds to a specific stage of the loading process.
 #[derive(Debug, thiserror::Error)]
@@ -41,7 +41,7 @@ pub enum LoadError {
     #[error("parse error: {0}")]
     Parse(#[from] ParseError),
 
-    /// A validation error occurred while constructing a `VRPInstance`.
+    /// A validation error occurred while constructing a `VrpInstance`.
     ///
     /// This variant is returned when the parsed data is structurally correct
     /// but fails semantic validation, such as invalid problem definitions.
@@ -49,7 +49,7 @@ pub enum LoadError {
     Validation(#[from] ValidationError),
 }
 
-/// Loads a VRPLib file and constructs a `VRPInstance`.
+/// Loads a VRPLib file and constructs a `VrpInstance`.
 ///
 /// # Errors
 /// - [`LoadError::Io`] if reading the file fails
@@ -61,7 +61,7 @@ pub enum LoadError {
 /// let instance = vrp_parser::read_from_vrplib("ORTEC-n242-k12.vrp").unwrap();
 /// assert_eq!(instance.dimension(), 242);
 /// ```
-pub fn read_from_vrplib<P>(filename: P) -> Result<VRPInstance<u64>, LoadError>
+pub fn read_from_vrplib<P>(filename: P) -> Result<VrpInstance<u64>, LoadError>
 where
     P: AsRef<Path>,
 {
@@ -74,12 +74,12 @@ where
     }
 
     let parsed = parse::<u64>(&tokens)?;
-    let builder = VRPInstanceBuilder::make_from_vrplib(parsed);
+    let builder = VrpInstanceBuilder::make_from_vrplib(parsed);
     let instance = builder.build()?;
     Ok(instance)
 }
 
-/// Loads a VRPLib file and constructs a `VRPInstance<f64>`.
+/// Loads a VRPLib file and constructs a `VrpInstance<f64>`.
 ///
 /// Identical to [`read_from_vrplib`] except that all numeric values
 /// (edge weights, demands, capacity) are represented as `f64`. Edge weights
@@ -91,7 +91,7 @@ where
 /// - [`LoadError::Token`] if tokenizing the VRPLib file fails
 /// - [`LoadError::Parse`] if parsing the VRPLib file fails
 /// - [`LoadError::Validation`] if instance validation fails
-pub fn read_from_vrplib_f64<P>(filename: P) -> Result<VRPInstance<f64>, LoadError>
+pub fn read_from_vrplib_f64<P>(filename: P) -> Result<VrpInstance<f64>, LoadError>
 where
     P: AsRef<Path>,
 {
@@ -104,7 +104,7 @@ where
     }
 
     let parsed = parse::<f64>(&tokens)?;
-    let builder = VRPInstanceBuilder::make_from_vrplib(parsed);
+    let builder = VrpInstanceBuilder::make_from_vrplib(parsed);
     let instance = builder.build()?;
     Ok(instance)
 }

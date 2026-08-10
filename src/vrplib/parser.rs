@@ -360,7 +360,7 @@ mod tests {
 
         let expected = SectionData::<u64> {
             name: Some("This is a name.".to_string()),
-            problem_type: Some(ProblemType::CVRP),
+            problem_type: Some(ProblemType::Cvrp),
             dimension: Some(3),
             edge_weight_type: Some(EdgeWeightType::Explicit),
             edge_weight_format: Some(EdgeWeightFormat::LowerRow),
@@ -510,7 +510,7 @@ mod tests {
     fn test_validate_format_succeeds() {
         let sut = SectionData::<u64> {
             name: Some("This is a name.".to_string()),
-            problem_type: Some(ProblemType::CVRP),
+            problem_type: Some(ProblemType::Cvrp),
             dimension: Some(3),
             edge_weight_type: Some(EdgeWeightType::Explicit),
             edge_weight_format: Some(EdgeWeightFormat::LowerRow),
@@ -532,7 +532,7 @@ mod tests {
     fn test_validate_format_fails_if_missing_name() {
         let sut = SectionData::<u64> {
             name: None,
-            problem_type: Some(ProblemType::CVRP),
+            problem_type: Some(ProblemType::Cvrp),
             dimension: Some(3),
             edge_weight_type: Some(EdgeWeightType::Explicit),
             edge_weight_format: Some(EdgeWeightFormat::LowerRow),
@@ -576,7 +576,7 @@ mod tests {
     fn test_validate_format_fails_if_missing_dimension() {
         let sut = SectionData::<u64> {
             name: Some("This is a name.".to_string()),
-            problem_type: Some(ProblemType::CVRP),
+            problem_type: Some(ProblemType::Cvrp),
             dimension: None,
             edge_weight_type: Some(EdgeWeightType::Explicit),
             edge_weight_format: Some(EdgeWeightFormat::LowerRow),
@@ -598,7 +598,7 @@ mod tests {
     fn test_validate_format_fails_if_missing_edge_weight_type() {
         let sut = SectionData::<u64> {
             name: Some("This is a name.".to_string()),
-            problem_type: Some(ProblemType::CVRP),
+            problem_type: Some(ProblemType::Cvrp),
             dimension: Some(3),
             edge_weight_type: None,
             edge_weight_format: Some(EdgeWeightFormat::LowerRow),
@@ -620,7 +620,7 @@ mod tests {
     fn test_validate_format_fails_if_missing_edge_weight_format() {
         let sut = SectionData::<u64> {
             name: Some("This is a name.".to_string()),
-            problem_type: Some(ProblemType::CVRP),
+            problem_type: Some(ProblemType::Cvrp),
             dimension: Some(3),
             edge_weight_type: Some(EdgeWeightType::Explicit),
             edge_weight_format: None,
@@ -642,7 +642,7 @@ mod tests {
     fn test_validate_format_fails_if_edge_weights_are_invalid() {
         let sut = SectionData::<u64> {
             name: Some("This is a name.".to_string()),
-            problem_type: Some(ProblemType::CVRP),
+            problem_type: Some(ProblemType::Cvrp),
             dimension: Some(3),
             edge_weight_type: Some(EdgeWeightType::Explicit),
             edge_weight_format: Some(EdgeWeightFormat::LowerRow),
@@ -664,7 +664,7 @@ mod tests {
     fn test_validate_format_fails_if_node_coords_are_invalid() {
         let sut = SectionData::<u64> {
             name: Some("This is a name.".to_string()),
-            problem_type: Some(ProblemType::CVRP),
+            problem_type: Some(ProblemType::Cvrp),
             dimension: Some(3),
             edge_weight_type: Some(EdgeWeightType::Explicit),
             edge_weight_format: Some(EdgeWeightFormat::LowerRow),
@@ -690,7 +690,7 @@ mod tests {
     fn test_validate_format_fails_if_node_coords_type_not_given() {
         let sut = SectionData::<u64> {
             name: Some("This is a name.".to_string()),
-            problem_type: Some(ProblemType::CVRP),
+            problem_type: Some(ProblemType::Cvrp),
             dimension: Some(3),
             edge_weight_type: Some(EdgeWeightType::Explicit),
             edge_weight_format: Some(EdgeWeightFormat::LowerRow),
@@ -712,7 +712,7 @@ mod tests {
     fn test_validate_format_fails_if_node_coords_are_invalid_euc2d() {
         let sut = SectionData::<u64> {
             name: Some("This is a name.".to_string()),
-            problem_type: Some(ProblemType::CVRP),
+            problem_type: Some(ProblemType::Cvrp),
             dimension: Some(3),
             edge_weight_type: Some(EdgeWeightType::Euc2D),
             edge_weight_format: None,
@@ -738,7 +738,7 @@ mod tests {
     fn test_validate_format_succeeds_full_matrix() {
         let sut = SectionData::<u64> {
             name: Some("This is a name.".to_string()),
-            problem_type: Some(ProblemType::CVRP),
+            problem_type: Some(ProblemType::Cvrp),
             dimension: Some(3),
             edge_weight_type: Some(EdgeWeightType::Explicit),
             edge_weight_format: Some(EdgeWeightFormat::FullMatrix),
@@ -759,7 +759,7 @@ mod tests {
     fn test_validate_format_fails_if_full_matrix_edge_weights_are_invalid() {
         let sut = SectionData::<u64> {
             name: Some("This is a name.".to_string()),
-            problem_type: Some(ProblemType::CVRP),
+            problem_type: Some(ProblemType::Cvrp),
             dimension: Some(3),
             edge_weight_type: Some(EdgeWeightType::Explicit),
             edge_weight_format: Some(EdgeWeightFormat::FullMatrix),
@@ -780,7 +780,7 @@ mod tests {
     fn test_validate_format_fails_if_demands_are_invalid() {
         let sut = SectionData::<u64> {
             name: Some("This is a name.".to_string()),
-            problem_type: Some(ProblemType::CVRP),
+            problem_type: Some(ProblemType::Cvrp),
             dimension: Some(3),
             edge_weight_type: Some(EdgeWeightType::Explicit),
             edge_weight_format: Some(EdgeWeightFormat::LowerRow),
@@ -802,7 +802,7 @@ mod tests {
     fn test_validate_format_fails_if_depots_are_invalid() {
         let sut = SectionData::<u64> {
             name: Some("This is a name.".to_string()),
-            problem_type: Some(ProblemType::CVRP),
+            problem_type: Some(ProblemType::Cvrp),
             dimension: Some(3),
             edge_weight_type: Some(EdgeWeightType::Explicit),
             edge_weight_format: Some(EdgeWeightFormat::LowerRow),

@@ -6,7 +6,7 @@ use crate::common::matrix::expand_lower_row;
 use crate::vrplib::parser::SectionData;
 
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct VRPInstanceBuilder<T> {
+pub(crate) struct VrpInstanceBuilder<T> {
     name: String,
     problem_type: ProblemType,
     edge_weight_kind: EdgeWeightKind,
@@ -21,7 +21,7 @@ pub(crate) struct VRPInstanceBuilder<T> {
 /// Represents a fully constructed Vehicle Routing Problem (VRP) instance
 /// loaded from a VRPLib file.
 ///
-/// A `VRPInstance<T>` contains all data required to describe a VRP, including
+/// A `VrpInstance<T>` contains all data required to describe a VRP, including
 /// problem metadata, node information, distance or cost matrices, and
 /// problem‑specific attributes such as vehicle capacity and customer demands.
 /// The type parameter `T` determines the numeric representation used for values
@@ -31,7 +31,7 @@ pub(crate) struct VRPInstanceBuilder<T> {
 /// This structure is created only after successful parsing and validation of
 /// a VRPLib file. All fields therefore represent a semantically consistent
 /// instance. Optional fields are present only for problem types that require
-/// them (e.g., capacity and demands for [`ProblemType::CVRP`]).
+/// them (e.g., capacity and demands for [`ProblemType::Cvrp`]).
 ///
 /// Edge weights are stored as a fully expanded matrix, regardless of the
 /// original VRPLib representation.
@@ -52,10 +52,10 @@ pub(crate) struct VRPInstanceBuilder<T> {
 /// - `demands`: Customer demands for each node (if applicable).
 /// - `node_coords`: Node coordinates (if provided in the VRPLib file).
 ///
-/// A `VRPInstance` is immutable after construction and can be used directly
+/// A `VrpInstance` is immutable after construction and can be used directly
 /// by solvers, heuristics, or analysis tools.
 #[derive(Debug, Clone, PartialEq)]
-pub struct VRPInstance<T> {
+pub struct VrpInstance<T> {
     name: String,
     problem_type: ProblemType,
     dimension: usize,
@@ -82,7 +82,7 @@ pub enum ValidationError {
     InvalidDemandsLength,
 }
 
-impl<T: Numeric> VRPInstanceBuilder<T> {
+impl<T: Numeric> VrpInstanceBuilder<T> {
     pub fn new(
         name: String,
         problem_type: ProblemType,
@@ -165,8 +165,8 @@ impl<T: Numeric> VRPInstanceBuilder<T> {
     }
 }
 
-impl VRPInstanceBuilder<u64> {
-    pub fn build(mut self) -> Result<VRPInstance<u64>, ValidationError> {
+impl VrpInstanceBuilder<u64> {
+    pub fn build(mut self) -> Result<VrpInstance<u64>, ValidationError> {
         let edge_weights = match self.edge_weight_kind {
             EdgeWeightKind::LowerRow => {
                 self.edge_weights
@@ -199,7 +199,7 @@ impl VRPInstanceBuilder<u64> {
         }
 
         match self.problem_type {
-            ProblemType::CVRP => {
+            ProblemType::Cvrp => {
                 self.capacity
                     .as_ref()
                     .ok_or(ValidationError::MissingCapacity)?;
@@ -209,7 +209,7 @@ impl VRPInstanceBuilder<u64> {
 
                 self.validate_demands()?;
 
-                Ok(VRPInstance::new(
+                Ok(VrpInstance::new(
                     self.name,
                     self.problem_type,
                     self.dimension,
@@ -224,8 +224,8 @@ impl VRPInstanceBuilder<u64> {
     }
 }
 
-impl VRPInstanceBuilder<f64> {
-    pub fn build(mut self) -> Result<VRPInstance<f64>, ValidationError> {
+impl VrpInstanceBuilder<f64> {
+    pub fn build(mut self) -> Result<VrpInstance<f64>, ValidationError> {
         let edge_weights = match self.edge_weight_kind {
             EdgeWeightKind::LowerRow => {
                 self.edge_weights
@@ -258,7 +258,7 @@ impl VRPInstanceBuilder<f64> {
         }
 
         match self.problem_type {
-            ProblemType::CVRP => {
+            ProblemType::Cvrp => {
                 self.capacity
                     .as_ref()
                     .ok_or(ValidationError::MissingCapacity)?;
@@ -268,7 +268,7 @@ impl VRPInstanceBuilder<f64> {
 
                 self.validate_demands()?;
 
-                Ok(VRPInstance::new(
+                Ok(VrpInstance::new(
                     self.name,
                     self.problem_type,
                     self.dimension,
@@ -283,7 +283,7 @@ impl VRPInstanceBuilder<f64> {
     }
 }
 
-impl<T> VRPInstance<T> {
+impl<T> VrpInstance<T> {
     #[allow(clippy::too_many_arguments)]
     fn new(
         name: String,
@@ -341,7 +341,7 @@ impl<T> VRPInstance<T> {
     /// Returns the demand value for each node, if applicable.
     ///
     /// This field is present for problem types that require customer demands,
-    /// such as [`ProblemType::CVRP`]. For other problem types, it is `None`.
+    /// such as [`ProblemType::Cvrp`]. For other problem types, it is `None`.
     pub fn demands(&self) -> &Option<Vec<T>> {
         &self.demands
     }
@@ -354,7 +354,7 @@ impl<T> VRPInstance<T> {
     /// Returns the vehicle capacity, if defined for this instance.
     ///
     /// Capacity is required for capacitated VRP variants such as
-    /// [`ProblemType::CVRP`]. For problem types without capacity constraints,
+    /// [`ProblemType::Cvrp`]. For problem types without capacity constraints,
     /// this field is `None`.
     pub fn capacity(&self) -> &Option<T> {
         &self.capacity
@@ -391,10 +391,10 @@ mod tests {
     use crate::vrplib::edge_weight_type::EdgeWeightType;
     use crate::vrplib::node_coord_type::NodeCoordType;
 
-    fn build_instance_with_edge_weights() -> VRPInstance<u64> {
-        VRPInstance {
+    fn build_instance_with_edge_weights() -> VrpInstance<u64> {
+        VrpInstance {
             name: "test".to_string(),
-            problem_type: ProblemType::CVRP,
+            problem_type: ProblemType::Cvrp,
             dimension: 3,
             depots: vec![0],
             capacity: None,
@@ -422,10 +422,10 @@ mod tests {
         assert_eq!(sut.get_edge_weight(0, 99), None);
     }
 
-    fn build_instance_with_coords() -> VRPInstance<u64> {
-        VRPInstance {
+    fn build_instance_with_coords() -> VrpInstance<u64> {
+        VrpInstance {
             name: "test".to_string(),
-            problem_type: ProblemType::CVRP,
+            problem_type: ProblemType::Cvrp,
             dimension: 3,
             depots: vec![0],
             capacity: Some(10),
@@ -449,9 +449,9 @@ mod tests {
 
     #[test]
     fn test_get_node_coord_returns_none_when_coords_absent() {
-        let sut = VRPInstance::<u64> {
+        let sut = VrpInstance::<u64> {
             name: "test".to_string(),
-            problem_type: ProblemType::CVRP,
+            problem_type: ProblemType::Cvrp,
             dimension: 3,
             depots: vec![0],
             capacity: None,
@@ -462,10 +462,10 @@ mod tests {
         assert_eq!(sut.get_node_coord(0), None);
     }
 
-    fn build_instance_with_demands() -> VRPInstance<u64> {
-        VRPInstance {
+    fn build_instance_with_demands() -> VrpInstance<u64> {
+        VrpInstance {
             name: "test".to_string(),
-            problem_type: ProblemType::CVRP,
+            problem_type: ProblemType::Cvrp,
             dimension: 3,
             depots: vec![0],
             capacity: Some(10),
@@ -489,9 +489,9 @@ mod tests {
 
     #[test]
     fn test_get_demand_returns_none_when_demands_absent() {
-        let sut = VRPInstance {
+        let sut = VrpInstance {
             name: "test".to_string(),
-            problem_type: ProblemType::CVRP,
+            problem_type: ProblemType::Cvrp,
             dimension: 3,
             depots: vec![0],
             capacity: None,
@@ -506,7 +506,7 @@ mod tests {
     fn test_make_from_vrplib() {
         let sut = SectionData::<u64> {
             name: Some("This is a name.".to_string()),
-            problem_type: Some(ProblemType::CVRP),
+            problem_type: Some(ProblemType::Cvrp),
             dimension: Some(3),
             edge_weight_type: Some(EdgeWeightType::Explicit),
             edge_weight_format: Some(EdgeWeightFormat::LowerRow),
@@ -518,11 +518,11 @@ mod tests {
             depots: vec![1],
         };
 
-        let value = VRPInstanceBuilder::make_from_vrplib(sut);
+        let value = VrpInstanceBuilder::make_from_vrplib(sut);
 
-        let expected = VRPInstanceBuilder::<u64> {
+        let expected = VrpInstanceBuilder::<u64> {
             name: "This is a name.".to_string(),
-            problem_type: ProblemType::CVRP,
+            problem_type: ProblemType::Cvrp,
             dimension: 3,
             edge_weight_kind: EdgeWeightKind::LowerRow,
             depots: vec![1],
@@ -536,9 +536,9 @@ mod tests {
 
     #[test]
     fn test_build_succeeds() {
-        let sut = VRPInstanceBuilder::<u64> {
+        let sut = VrpInstanceBuilder::<u64> {
             name: "This is a name.".to_string(),
-            problem_type: ProblemType::CVRP,
+            problem_type: ProblemType::Cvrp,
             dimension: 3,
             edge_weight_kind: EdgeWeightKind::LowerRow,
             depots: vec![1],
@@ -550,9 +550,9 @@ mod tests {
 
         let value = sut.build().unwrap();
 
-        let expected = VRPInstance {
+        let expected = VrpInstance {
             name: "This is a name.".to_string(),
-            problem_type: ProblemType::CVRP,
+            problem_type: ProblemType::Cvrp,
             dimension: 3,
             depots: vec![1],
             capacity: Some(2u64),
@@ -565,9 +565,9 @@ mod tests {
 
     #[test]
     fn test_build_fails_if_missing_depots() {
-        let sut = VRPInstanceBuilder::<u64> {
+        let sut = VrpInstanceBuilder::<u64> {
             name: "This is a name.".to_string(),
-            problem_type: ProblemType::CVRP,
+            problem_type: ProblemType::Cvrp,
             dimension: 3,
             edge_weight_kind: EdgeWeightKind::LowerRow,
             depots: vec![], // is empty
@@ -585,9 +585,9 @@ mod tests {
 
     #[test]
     fn test_build_fails_if_missing_demands() {
-        let sut = VRPInstanceBuilder::<u64> {
+        let sut = VrpInstanceBuilder::<u64> {
             name: "This is a name.".to_string(),
-            problem_type: ProblemType::CVRP,
+            problem_type: ProblemType::Cvrp,
             dimension: 3,
             edge_weight_kind: EdgeWeightKind::LowerRow,
             depots: vec![1],
@@ -605,9 +605,9 @@ mod tests {
 
     #[test]
     fn test_build_fails_if_missing_capacity() {
-        let sut = VRPInstanceBuilder::<u64> {
+        let sut = VrpInstanceBuilder::<u64> {
             name: "This is a name.".to_string(),
-            problem_type: ProblemType::CVRP,
+            problem_type: ProblemType::Cvrp,
             dimension: 3,
             edge_weight_kind: EdgeWeightKind::LowerRow,
             depots: vec![1],
@@ -625,9 +625,9 @@ mod tests {
 
     #[test]
     fn test_build_fails_if_missing_edge_weights() {
-        let sut = VRPInstanceBuilder::<u64> {
+        let sut = VrpInstanceBuilder::<u64> {
             name: "This is a name.".to_string(),
-            problem_type: ProblemType::CVRP,
+            problem_type: ProblemType::Cvrp,
             dimension: 3,
             edge_weight_kind: EdgeWeightKind::LowerRow,
             depots: vec![1],
@@ -645,9 +645,9 @@ mod tests {
 
     #[test]
     fn test_build_fails_if_missing_node_coords() {
-        let sut = VRPInstanceBuilder::<u64> {
+        let sut = VrpInstanceBuilder::<u64> {
             name: "This is a name.".to_string(),
-            problem_type: ProblemType::CVRP,
+            problem_type: ProblemType::Cvrp,
             dimension: 3,
             edge_weight_kind: EdgeWeightKind::Euc2D,
             depots: vec![1],
@@ -665,9 +665,9 @@ mod tests {
 
     #[test]
     fn test_build_f64_succeeds() {
-        let sut = VRPInstanceBuilder::<f64> {
+        let sut = VrpInstanceBuilder::<f64> {
             name: "This is a name.".to_string(),
-            problem_type: ProblemType::CVRP,
+            problem_type: ProblemType::Cvrp,
             dimension: 3,
             edge_weight_kind: EdgeWeightKind::LowerRow,
             depots: vec![1],
@@ -679,9 +679,9 @@ mod tests {
 
         let value = sut.build().unwrap();
 
-        let expected = VRPInstance {
+        let expected = VrpInstance {
             name: "This is a name.".to_string(),
-            problem_type: ProblemType::CVRP,
+            problem_type: ProblemType::Cvrp,
             dimension: 3,
             depots: vec![1],
             capacity: Some(2.0f64),
