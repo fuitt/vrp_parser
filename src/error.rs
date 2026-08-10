@@ -1,6 +1,6 @@
 use crate::instance::ValidationError;
+use crate::vrplib::lexer::TokenError;
 use crate::vrplib::parser::ParseError;
-use crate::vrplib::token::TokenError;
 
 /// Represents all possible errors that can occur while loading a VRP instance file.
 ///
