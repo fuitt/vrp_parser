@@ -1,11 +1,11 @@
 use std::convert::TryFrom;
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum NodeCoordType {
     TwodCoords,
 }
 
-#[derive(Debug, PartialEq, thiserror::Error)]
+#[derive(Debug, Eq, PartialEq, thiserror::Error)]
 pub enum ParseNodeCoordTypeError {
     #[error("unknown node coordinate type: {0}")]
     UnknownType(String),

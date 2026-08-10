@@ -1,4 +1,4 @@
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub(crate) enum Token {
     Name(String),
     Comment(String),
@@ -16,7 +16,7 @@ pub(crate) enum Token {
     Data(Vec<String>),
 }
 
-#[derive(Debug, PartialEq, thiserror::Error)]
+#[derive(Debug, Eq, PartialEq, thiserror::Error)]
 pub enum TokenError {
     #[error("unrecognized key: {0}")]
     UnknownKey(String),

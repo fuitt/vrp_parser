@@ -66,7 +66,7 @@ pub struct VRPInstance<T> {
     node_coords: Option<Vec<(f64, f64)>>,
 }
 
-#[derive(Debug, PartialEq, thiserror::Error)]
+#[derive(Debug, Eq, PartialEq, thiserror::Error)]
 pub enum ValidationError {
     #[error("missing capacity")]
     MissingCapacity,

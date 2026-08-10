@@ -1,12 +1,12 @@
 use std::convert::TryFrom;
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum EdgeWeightType {
     Euc2D,
     Explicit,
 }
 
-#[derive(Debug, PartialEq, thiserror::Error)]
+#[derive(Debug, Eq, PartialEq, thiserror::Error)]
 pub enum ParseEdgeWeightTypeError {
     #[error("unknown edge weight type: {0}")]
     UnknownType(String),

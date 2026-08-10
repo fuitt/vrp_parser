@@ -1,11 +1,11 @@
 use std::convert::TryFrom;
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum EdgeWeightFormat {
     LowerRow,
 }
 
-#[derive(Debug, PartialEq, thiserror::Error)]
+#[derive(Debug, Eq, PartialEq, thiserror::Error)]
 pub enum ParseEdgeWeightFormatError {
     #[error("unknown edge weight format: {0}")]
     UnknownFormat(String),

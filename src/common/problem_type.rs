@@ -6,7 +6,7 @@
 ///
 /// - `CVRP`: The Capacitated Vehicle Routing Problem, where each
 ///   customer has a demand and each vehicle has a capacity limit.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ProblemType {
     CVRP,
 }

@@ -23,7 +23,7 @@ use crate::vrplib::edge_weight_type::EdgeWeightType;
 /// - `Euc2D`: The edge weights are computed as the Euclidean distance between
 ///   2D coordinates. This corresponds to VRPLib’s `EDGE_WEIGHT_TYPE = EUC_2D` with no
 ///   `EDGE_WEIGHT_FORMAT`.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum EdgeWeightKind {
     LowerRow,
     Euc2D,

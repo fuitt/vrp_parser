@@ -2,7 +2,7 @@ use std::convert::TryFrom;
 
 use crate::ProblemType;
 
-#[derive(Debug, PartialEq, thiserror::Error)]
+#[derive(Debug, Eq, PartialEq, thiserror::Error)]
 pub enum ParseProblemTypeError {
     #[error("unknown problem type: {0}")]
     UnknownType(String),

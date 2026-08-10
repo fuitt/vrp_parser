@@ -29,7 +29,7 @@ pub(crate) struct SectionData<T> {
     pub depots: Vec<usize>,
 }
 
-#[derive(Debug, PartialEq, thiserror::Error)]
+#[derive(Debug, Eq, PartialEq, thiserror::Error)]
 pub enum ParseError {
     #[error("missing name")]
     MissingName,
