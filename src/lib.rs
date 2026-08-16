@@ -23,7 +23,7 @@ pub use instance::VrpInstance;
 pub(crate) use instance::VrpInstanceBuilder;
 pub(crate) use model::EdgeWeightKind;
 pub use model::ProblemType;
-pub use solomon::reader::read_from_solomon;
+pub use solomon::reader::read_from_solomon_f64;
 pub(crate) use util::Numeric;
 pub use vrplib::reader::read_from_vrplib;
 pub use vrplib::reader::read_from_vrplib_f64;

@@ -21,7 +21,7 @@ use crate::VrpInstanceBuilder;
 /// - [`LoadError::Io`] if reading the file fails
 /// - [`LoadError::Solomon`] if parsing the file fails
 /// - [`LoadError::Validation`] if instance validation fails
-pub fn read_from_solomon<P>(filename: P) -> Result<VrpInstance<f64>, LoadError>
+pub fn read_from_solomon_f64<P>(filename: P) -> Result<VrpInstance<f64>, LoadError>
 where
     P: AsRef<Path>,
 {

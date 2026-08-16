@@ -1,11 +1,11 @@
-use vrp_parser::{ProblemType, read_from_solomon};
+use vrp_parser::{ProblemType, read_from_solomon_f64};
 
 #[test]
 #[ignore]
 fn test_read_from_solomon_succeeds() {
     let filename = "tests/data/solomon_format/read_solomon.txt";
 
-    let sut = read_from_solomon(filename).unwrap();
+    let sut = read_from_solomon_f64(filename).unwrap();
 
     assert_eq!(sut.name(), "TestInstance");
     assert_eq!(sut.dimension(), 3);
