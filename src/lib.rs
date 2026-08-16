@@ -1,15 +1,19 @@
 //! # vrplib
 //!
-//! A library for loading VRPLib-formatted files and representing them as VRP instances.
+//! A library for loading VRP instance files and representing them as VRP instances.
 //!
-//! ## Features
-//! - Loading VRPLib files
-//! - Lexical and syntactic parsing
-//! - Instance validation
+//! ## Supported formats
+//! - **VRPLib**: use [`read_from_vrplib`] (integer weights) or [`read_from_vrplib_f64`]
+//!   (floating-point weights)
+//! - **Solomon**: use [`read_from_solomon_f64`] for CVRPTW instances
 //!
-//! ## Example
+//! ## Examples
 //! ```no_run
+//! // VRPLib (CVRP)
 //! let instance = vrp_parser::read_from_vrplib("example.vrp").unwrap();
+//!
+//! // Solomon (CVRPTW)
+//! let instance = vrp_parser::read_from_solomon_f64("example.txt").unwrap();
 //! ```
 pub(crate) mod error;
 pub(crate) mod instance;

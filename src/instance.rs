@@ -32,31 +32,37 @@ pub(crate) struct VrpInstanceBuilder<T> {
 /// problem‑specific attributes such as vehicle capacity and customer demands.
 /// The type parameter `T` determines the numeric representation used for values
 /// such as edge weights and demands. Common choices include `u64` for standard
-/// VRPLib instances.
+/// VRPLib instances and `f64` for Solomon instances or fractional weights.
 ///
 /// This structure is created only after successful parsing and validation of
-/// a VRPLib file. All fields therefore represent a semantically consistent
+/// an instance file. All fields therefore represent a semantically consistent
 /// instance. Optional fields are present only for problem types that require
-/// them (e.g., capacity and demands for [`ProblemType::Cvrp`]).
+/// them (e.g., capacity and demands for [`ProblemType::Cvrp`]; time windows,
+/// service times, and vehicle count for [`ProblemType::Cvrptw`]).
 ///
 /// Edge weights are stored as a fully expanded matrix, regardless of the
-/// original VRPLib representation.
+/// original format representation.
 ///
 /// # Type Parameters
 /// - `T`: The numeric type representing values such as edge weights and demands.
 ///   Typically:
 ///   - `u64`: The standard VRPLib-compliant integer representation.
-///   - `f64`: A floating-point representation for fractional weights and demands.
+///   - `f64`: A floating-point representation for fractional weights and demands,
+///     used by [`read_from_vrplib_f64`](crate::read_from_vrplib_f64) and
+///     [`read_from_solomon_f64`](crate::read_from_solomon_f64).
 ///
 /// # Fields
-/// - `name`: The instance name as specified in the VRPLib file.
+/// - `name`: The instance name.
 /// - `problem_type`: The VRP variant (see [`ProblemType`]).
 /// - `dimension`: The number of nodes in the instance.
 /// - `depots`: Indices of depot nodes.
 /// - `edge_weights`: A fully expanded distance or cost matrix.
 /// - `capacity`: Vehicle capacity (if applicable).
 /// - `demands`: Customer demands for each node (if applicable).
-/// - `node_coords`: Node coordinates (if provided in the VRPLib file).
+/// - `node_coords`: Node coordinates (if provided).
+/// - `time_windows`: Per-node `(ready_time, due_date)` pairs (CVRPTW only).
+/// - `service_times`: Per-node service durations (CVRPTW only).
+/// - `vehicle_count`: Number of available vehicles (Solomon instances only).
 ///
 /// A `VrpInstance` is immutable after construction and can be used directly
 /// by solvers, heuristics, or analysis tools.

@@ -12,7 +12,7 @@ use crate::VrpInstanceBuilder;
 ///
 /// The Solomon format encodes a CVRPTW instance: nodes with 2D coordinates,
 /// demands, time windows, service times, and a vehicle fleet with uniform
-/// capacity. Edge weights are computed as rounded Euclidean distances.
+/// capacity. Edge weights are computed as exact (non-rounded) Euclidean distances.
 ///
 /// Node 0 in the file is the depot; all remaining nodes are customers.
 /// The depot index stored in [`VrpInstance::depots`] is `0` (0-based).
