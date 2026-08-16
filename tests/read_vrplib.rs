@@ -1,4 +1,4 @@
-use vrp_parser::{LoadError, ProblemType, read_from_vrplib, read_from_vrplib_f64};
+use vrp_parser::{LoadError, ProblemType, VrplibError, read_from_vrplib, read_from_vrplib_f64};
 
 #[test]
 #[ignore]
@@ -108,7 +108,7 @@ fn test_read_from_vrplib_f64_fails() {
     let sut = read_from_vrplib_f64(filename);
 
     match sut {
-        Err(LoadError::Parse(_)) => {}
+        Err(LoadError::Vrplib(VrplibError::Parse(_))) => {}
         _ => panic!(),
     }
 }
@@ -144,7 +144,7 @@ fn test_read_from_vrplib_fails() {
     let sut = read_from_vrplib(filename);
 
     match sut {
-        Err(LoadError::Parse(_)) => {}
+        Err(LoadError::Vrplib(VrplibError::Parse(_))) => {}
         _ => panic!(),
     }
 }

@@ -1,7 +1,10 @@
 use crate::EdgeWeightKind;
 use crate::Numeric;
 use crate::ProblemType;
-use crate::util::edge_weight::{edge_weight_by_euc2d, edge_weight_by_euc2d_f64};
+use crate::solomon::parser::SolomonData;
+use crate::util::edge_weight::{
+    edge_weight_by_euc2d, edge_weight_by_euc2d_f64, euclidean_distance,
+};
 use crate::util::matrix::expand_lower_row;
 use crate::vrplib::parser::SectionData;
 
@@ -16,6 +19,9 @@ pub(crate) struct VrpInstanceBuilder<T> {
     demands: Option<Vec<T>>,
     node_coords: Option<Vec<(f64, f64)>>,
     edge_weights: Option<Vec<Vec<T>>>,
+    time_windows: Option<Vec<(f64, f64)>>,
+    service_times: Option<Vec<f64>>,
+    vehicle_count: Option<usize>,
 }
 
 /// Represents a fully constructed Vehicle Routing Problem (VRP) instance
@@ -64,6 +70,9 @@ pub struct VrpInstance<T> {
     capacity: Option<T>,
     demands: Option<Vec<T>>,
     node_coords: Option<Vec<(f64, f64)>>,
+    time_windows: Option<Vec<(f64, f64)>>,
+    service_times: Option<Vec<f64>>,
+    vehicle_count: Option<usize>,
 }
 
 #[derive(Debug, Eq, PartialEq, thiserror::Error)]
@@ -78,6 +87,10 @@ pub enum ValidationError {
     MissingEdgeWeight,
     #[error("missing node coords")]
     MissingNodeCoords,
+    #[error("missing time windows")]
+    MissingTimeWindows,
+    #[error("missing service times")]
+    MissingServiceTimes,
     #[error("invalid demands length")]
     InvalidDemandsLength,
 }
@@ -99,6 +112,9 @@ impl<T: Numeric> VrpInstanceBuilder<T> {
             demands: None,
             node_coords: None,
             edge_weights: None,
+            time_windows: None,
+            service_times: None,
+            vehicle_count: None,
         }
     }
 
@@ -124,6 +140,21 @@ impl<T: Numeric> VrpInstanceBuilder<T> {
 
     pub fn edge_weights(mut self, edge_weights: Option<Vec<Vec<T>>>) -> Self {
         self.edge_weights = edge_weights;
+        self
+    }
+
+    pub fn time_windows(mut self, time_windows: Option<Vec<(f64, f64)>>) -> Self {
+        self.time_windows = time_windows;
+        self
+    }
+
+    pub fn service_times(mut self, service_times: Option<Vec<f64>>) -> Self {
+        self.service_times = service_times;
+        self
+    }
+
+    pub fn vehicle_count(mut self, vehicle_count: Option<usize>) -> Self {
+        self.vehicle_count = vehicle_count;
         self
     }
 
@@ -165,6 +196,25 @@ impl<T: Numeric> VrpInstanceBuilder<T> {
     }
 }
 
+impl VrpInstanceBuilder<f64> {
+    pub(crate) fn make_from_solomon(data: SolomonData) -> Self {
+        let dimension = data.node_coords.len();
+        Self::new(
+            data.name,
+            ProblemType::Cvrptw,
+            dimension,
+            EdgeWeightKind::Euc2DExact,
+        )
+        .depots(vec![0])
+        .capacity(Some(data.capacity))
+        .demands(Some(data.demands))
+        .node_coords(Some(data.node_coords))
+        .time_windows(Some(data.time_windows))
+        .service_times(Some(data.service_times))
+        .vehicle_count(Some(data.vehicle_count))
+    }
+}
+
 impl VrpInstanceBuilder<u64> {
     pub fn build(mut self) -> Result<VrpInstance<u64>, ValidationError> {
         let edge_weights = match self.edge_weight_kind {
@@ -192,6 +242,7 @@ impl VrpInstanceBuilder<u64> {
                         .collect()
                 })
                 .collect(),
+            EdgeWeightKind::Euc2DExact => unreachable!("Euc2DExact produces f64 weights"),
         };
 
         if self.depots.is_empty() {
@@ -218,8 +269,12 @@ impl VrpInstanceBuilder<u64> {
                     self.capacity,
                     self.demands,
                     self.node_coords,
+                    None,
+                    None,
+                    None,
                 ))
             }
+            ProblemType::Cvrptw => unreachable!("CVRPTW instances use f64"),
         }
     }
 }
@@ -251,6 +306,20 @@ impl VrpInstanceBuilder<f64> {
                         .collect()
                 })
                 .collect(),
+            EdgeWeightKind::Euc2DExact => self
+                .node_coords
+                .as_ref()
+                .ok_or(ValidationError::MissingNodeCoords)?
+                .iter()
+                .map(|&p| {
+                    self.node_coords
+                        .as_ref()
+                        .unwrap()
+                        .iter()
+                        .map(|&q| euclidean_distance(p, q))
+                        .collect()
+                })
+                .collect(),
         };
 
         if self.depots.is_empty() {
@@ -277,6 +346,39 @@ impl VrpInstanceBuilder<f64> {
                     self.capacity,
                     self.demands,
                     self.node_coords,
+                    None,
+                    None,
+                    None,
+                ))
+            }
+            ProblemType::Cvrptw => {
+                self.capacity
+                    .as_ref()
+                    .ok_or(ValidationError::MissingCapacity)?;
+                self.demands
+                    .as_ref()
+                    .ok_or(ValidationError::MissingDemands)?;
+                self.time_windows
+                    .as_ref()
+                    .ok_or(ValidationError::MissingTimeWindows)?;
+                self.service_times
+                    .as_ref()
+                    .ok_or(ValidationError::MissingServiceTimes)?;
+
+                self.validate_demands()?;
+
+                Ok(VrpInstance::new(
+                    self.name,
+                    self.problem_type,
+                    self.dimension,
+                    self.depots,
+                    edge_weights,
+                    self.capacity,
+                    self.demands,
+                    self.node_coords,
+                    self.time_windows,
+                    self.service_times,
+                    self.vehicle_count,
                 ))
             }
         }
@@ -294,6 +396,9 @@ impl<T> VrpInstance<T> {
         capacity: Option<T>,
         demands: Option<Vec<T>>,
         node_coords: Option<Vec<(f64, f64)>>,
+        time_windows: Option<Vec<(f64, f64)>>,
+        service_times: Option<Vec<f64>>,
+        vehicle_count: Option<usize>,
     ) -> Self {
         Self {
             name,
@@ -304,6 +409,9 @@ impl<T> VrpInstance<T> {
             capacity,
             demands,
             node_coords,
+            time_windows,
+            service_times,
+            vehicle_count,
         }
     }
 
@@ -381,6 +489,38 @@ impl<T> VrpInstance<T> {
     pub fn get_edge_weight(&self, from: usize, to: usize) -> Option<&T> {
         self.edge_weights.get(from)?.get(to)
     }
+
+    /// Returns the time windows `(ready_time, due_date)` for each node, if defined.
+    ///
+    /// Present for [`ProblemType::Cvrptw`] instances (e.g., Solomon format).
+    /// `None` for problem types without time windows.
+    pub fn time_windows(&self) -> &Option<Vec<(f64, f64)>> {
+        &self.time_windows
+    }
+
+    /// Returns the time window for a specific node, or `None` if not defined or out of bounds.
+    pub fn get_time_window(&self, node: usize) -> Option<&(f64, f64)> {
+        self.time_windows.as_ref()?.get(node)
+    }
+
+    /// Returns the service time for each node, if defined.
+    ///
+    /// Present for [`ProblemType::Cvrptw`] instances. `None` otherwise.
+    pub fn service_times(&self) -> &Option<Vec<f64>> {
+        &self.service_times
+    }
+
+    /// Returns the service time for a specific node, or `None` if not defined or out of bounds.
+    pub fn get_service_time(&self, node: usize) -> Option<&f64> {
+        self.service_times.as_ref()?.get(node)
+    }
+
+    /// Returns the number of available vehicles, if specified by the instance format.
+    ///
+    /// Solomon instances include a vehicle count. VRPLib instances do not, so this is `None`.
+    pub fn vehicle_count(&self) -> Option<usize> {
+        self.vehicle_count
+    }
 }
 
 #[cfg(test)]
@@ -401,6 +541,9 @@ mod tests {
             demands: None,
             node_coords: None,
             edge_weights: vec![vec![0, 1, 2], vec![1, 0, 3], vec![2, 3, 0]],
+            time_windows: None,
+            service_times: None,
+            vehicle_count: None,
         }
     }
 
@@ -432,6 +575,9 @@ mod tests {
             demands: Some(vec![0, 5, 8]),
             node_coords: Some(vec![(1.0, 2.0), (3.0, 4.0), (5.0, 6.0)]),
             edge_weights: vec![vec![0, 1, 2], vec![1, 0, 3], vec![2, 3, 0]],
+            time_windows: None,
+            service_times: None,
+            vehicle_count: None,
         }
     }
 
@@ -458,6 +604,9 @@ mod tests {
             demands: None,
             node_coords: None,
             edge_weights: vec![vec![0, 1, 2], vec![1, 0, 3], vec![2, 3, 0]],
+            time_windows: None,
+            service_times: None,
+            vehicle_count: None,
         };
         assert_eq!(sut.get_node_coord(0), None);
     }
@@ -472,6 +621,9 @@ mod tests {
             demands: Some(vec![0, 5, 8]),
             node_coords: None,
             edge_weights: vec![vec![0, 1, 2], vec![1, 0, 3], vec![2, 3, 0]],
+            time_windows: None,
+            service_times: None,
+            vehicle_count: None,
         }
     }
 
@@ -498,6 +650,9 @@ mod tests {
             demands: None,
             node_coords: None,
             edge_weights: vec![vec![0u64, 1, 2], vec![1, 0, 3], vec![2, 3, 0]],
+            time_windows: None,
+            service_times: None,
+            vehicle_count: None,
         };
         assert_eq!(sut.get_demand(0), None);
     }
@@ -530,6 +685,9 @@ mod tests {
             demands: Some(vec![0, 11, 12]),
             node_coords: Some(vec![(0.0, 0.0), (7.0, 8.0), (9.0, 10.0)]),
             edge_weights: Some(vec![vec![4], vec![5, 6]]),
+            time_windows: None,
+            service_times: None,
+            vehicle_count: None,
         };
         assert_eq!(value, expected);
     }
@@ -546,6 +704,9 @@ mod tests {
             demands: Some(vec![0, 11, 12]),
             node_coords: Some(vec![(0.0, 0.0), (7.0, 8.0), (9.0, 10.0)]),
             edge_weights: Some(vec![vec![4], vec![5, 6]]),
+            time_windows: None,
+            service_times: None,
+            vehicle_count: None,
         };
 
         let value = sut.build().unwrap();
@@ -559,6 +720,9 @@ mod tests {
             demands: Some(vec![0, 11, 12]),
             node_coords: Some(vec![(0.0, 0.0), (7.0, 8.0), (9.0, 10.0)]),
             edge_weights: vec![vec![0, 4, 5], vec![4, 0, 6], vec![5, 6, 0]],
+            time_windows: None,
+            service_times: None,
+            vehicle_count: None,
         };
         assert_eq!(value, expected);
     }
@@ -575,6 +739,9 @@ mod tests {
             demands: Some(vec![0, 11, 12]),
             node_coords: Some(vec![(0.0, 0.0), (7.0, 8.0), (9.0, 10.0)]),
             edge_weights: Some(vec![vec![4], vec![5, 6]]),
+            time_windows: None,
+            service_times: None,
+            vehicle_count: None,
         };
 
         let value = sut.build().unwrap_err();
@@ -595,6 +762,9 @@ mod tests {
             demands: None, // not given
             node_coords: Some(vec![(0.0, 0.0), (7.0, 8.0), (9.0, 10.0)]),
             edge_weights: Some(vec![vec![4], vec![5, 6]]),
+            time_windows: None,
+            service_times: None,
+            vehicle_count: None,
         };
 
         let value = sut.build().unwrap_err();
@@ -615,6 +785,9 @@ mod tests {
             demands: Some(vec![0, 11, 12]),
             node_coords: Some(vec![(0.0, 0.0), (7.0, 8.0), (9.0, 10.0)]),
             edge_weights: Some(vec![vec![4], vec![5, 6]]),
+            time_windows: None,
+            service_times: None,
+            vehicle_count: None,
         };
 
         let value = sut.build().unwrap_err();
@@ -635,6 +808,9 @@ mod tests {
             demands: Some(vec![0, 11, 12]),
             node_coords: Some(vec![(0.0, 0.0), (7.0, 8.0), (9.0, 10.0)]),
             edge_weights: None, // not given
+            time_windows: None,
+            service_times: None,
+            vehicle_count: None,
         };
 
         let value = sut.build().unwrap_err();
@@ -655,6 +831,9 @@ mod tests {
             demands: Some(vec![0, 11, 12]),
             node_coords: None, // not given
             edge_weights: None,
+            time_windows: None,
+            service_times: None,
+            vehicle_count: None,
         };
 
         let value = sut.build().unwrap_err();
@@ -675,6 +854,9 @@ mod tests {
             demands: Some(vec![0.0, 11.0, 12.0]),
             node_coords: Some(vec![(0.0, 0.0), (7.0, 8.0), (9.0, 10.0)]),
             edge_weights: Some(vec![vec![4.0], vec![5.0, 6.0]]),
+            time_windows: None,
+            service_times: None,
+            vehicle_count: None,
         };
 
         let value = sut.build().unwrap();
@@ -692,6 +874,9 @@ mod tests {
                 vec![4.0, 0.0, 6.0],
                 vec![5.0, 6.0, 0.0],
             ],
+            time_windows: None,
+            service_times: None,
+            vehicle_count: None,
         };
         assert_eq!(value, expected);
     }

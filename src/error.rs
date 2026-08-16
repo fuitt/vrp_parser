@@ -1,12 +1,12 @@
 use crate::instance::ValidationError;
-use crate::vrplib::lexer::TokenError;
-use crate::vrplib::parser::ParseError;
+use crate::solomon::parser::SolomonParseError;
+use crate::vrplib::error::VrplibError;
 
 /// Represents all possible errors that can occur while loading a VRP instance file.
 ///
 /// This error type aggregates lower-level errors produced during the loading
-/// pipeline, including file I/O failures, tokenization errors, parsing errors,
-/// and validation errors encountered when constructing a `VrpInstance`.
+/// pipeline, including file I/O failures, format-specific errors, and
+/// validation errors encountered when constructing a `VrpInstance`.
 ///
 /// Each variant corresponds to a specific stage of the loading process.
 #[derive(Debug, thiserror::Error)]
@@ -18,19 +18,19 @@ pub enum LoadError {
     #[error("i/o error: {0}")]
     Io(#[from] std::io::Error),
 
-    /// A tokenization error occurred while converting raw text into tokens.
+    /// A VRPLib-specific error occurred during tokenization or parsing.
     ///
-    /// This variant is returned when the lexical analysis stage fails, such as
-    /// encountering an unexpected character or malformed token.
-    #[error("token error: {0}")]
-    Token(#[from] TokenError),
+    /// Holds either a [`VrplibError::Token`] from the lexical analysis stage
+    /// or a [`VrplibError::Parse`] from the structural parsing stage.
+    #[error("vrplib error: {0}")]
+    Vrplib(#[from] VrplibError),
 
-    /// A parsing error occurred while interpreting the tokenized input.
+    /// A Solomon parse error occurred while reading a Solomon-formatted file.
     ///
-    /// This indicates that the file contains syntactically invalid structures
-    /// or violates the expected format.
-    #[error("parse error: {0}")]
-    Parse(#[from] ParseError),
+    /// This variant is returned when the file does not conform to the
+    /// expected Solomon layout.
+    #[error("solomon parse error: {0}")]
+    Solomon(#[from] SolomonParseError),
 
     /// A validation error occurred while constructing a `VrpInstance`.
     ///

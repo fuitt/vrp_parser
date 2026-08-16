@@ -2,6 +2,7 @@ use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
 
+use super::error::VrplibError;
 use super::lexer::tokenize;
 use super::parser::parse;
 use crate::LoadError;
@@ -12,8 +13,7 @@ use crate::VrpInstanceBuilder;
 ///
 /// # Errors
 /// - [`LoadError::Io`] if reading the file fails
-/// - [`LoadError::Token`] if tokenizing the VRPLib file fails
-/// - [`LoadError::Parse`] if parsing the VRPLib file fails
+/// - [`LoadError::Vrplib`] if tokenizing or parsing the VRPLib file fails
 /// - [`LoadError::Validation`] if instance validation fails
 /// # Examples
 /// ```no_run
@@ -28,11 +28,11 @@ where
     let lines = read_lines(filename)?;
     for line in lines {
         let line = line?;
-        let tokenized = tokenize(&line)?;
+        let tokenized = tokenize(&line).map_err(VrplibError::Token)?;
         tokens.push(tokenized);
     }
 
-    let parsed = parse::<u64>(&tokens)?;
+    let parsed = parse::<u64>(&tokens).map_err(VrplibError::Parse)?;
     let builder = VrpInstanceBuilder::make_from_vrplib(parsed);
     let instance = builder.build()?;
     Ok(instance)
@@ -47,8 +47,7 @@ where
 ///
 /// # Errors
 /// - [`LoadError::Io`] if reading the file fails
-/// - [`LoadError::Token`] if tokenizing the VRPLib file fails
-/// - [`LoadError::Parse`] if parsing the VRPLib file fails
+/// - [`LoadError::Vrplib`] if tokenizing or parsing the VRPLib file fails
 /// - [`LoadError::Validation`] if instance validation fails
 pub fn read_from_vrplib_f64<P>(filename: P) -> Result<VrpInstance<f64>, LoadError>
 where
@@ -58,11 +57,11 @@ where
     let lines = read_lines(filename)?;
     for line in lines {
         let line = line?;
-        let tokenized = tokenize(&line)?;
+        let tokenized = tokenize(&line).map_err(VrplibError::Token)?;
         tokens.push(tokenized);
     }
 
-    let parsed = parse::<f64>(&tokens)?;
+    let parsed = parse::<f64>(&tokens).map_err(VrplibError::Parse)?;
     let builder = VrpInstanceBuilder::make_from_vrplib(parsed);
     let instance = builder.build()?;
     Ok(instance)

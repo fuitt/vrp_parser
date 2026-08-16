@@ -14,6 +14,7 @@
 pub(crate) mod error;
 pub(crate) mod instance;
 pub(crate) mod model;
+pub(crate) mod solomon;
 pub(crate) mod util;
 pub(crate) mod vrplib;
 
@@ -22,6 +23,9 @@ pub use instance::VrpInstance;
 pub(crate) use instance::VrpInstanceBuilder;
 pub(crate) use model::EdgeWeightKind;
 pub use model::ProblemType;
+pub use solomon::parser::SolomonParseError;
+pub use solomon::reader::read_from_solomon;
 pub(crate) use util::Numeric;
+pub use vrplib::error::VrplibError;
 pub use vrplib::reader::read_from_vrplib;
 pub use vrplib::reader::read_from_vrplib_f64;

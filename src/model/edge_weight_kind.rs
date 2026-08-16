@@ -15,19 +15,23 @@ use crate::vrplib::types::edge_weight_type::EdgeWeightType;
 /// into a single representation used internally by this library, allowing the
 /// loader and instance builder to treat all supported formats consistently.
 ///
-/// Currently, only the `LowerRow` and `Euc2D` format is supported.
-///
 /// - `LowerRow`: The lower triangular part of a symmetric matrix is listed
 ///   row by row, excluding the diagonal. This corresponds to VRPLib's
 ///   `EDGE_WEIGHT_FORMAT = LOWER_ROW` when used with `EDGE_WEIGHT_TYPE = EXPLICIT`.
-/// - `Euc2D`: The edge weights are computed as the Euclidean distance between
-///   2D coordinates. This corresponds to VRPLib's `EDGE_WEIGHT_TYPE = EUC_2D` with no
-///   `EDGE_WEIGHT_FORMAT`.
+/// - `FullMatrix`: A complete n×n matrix is stored explicitly. This corresponds
+///   to VRPLib's `EDGE_WEIGHT_FORMAT = FULL_MATRIX` when used with
+///   `EDGE_WEIGHT_TYPE = EXPLICIT`.
+/// - `Euc2D`: Edge weights are computed as the nearest-integer Euclidean
+///   distance between 2D coordinates. This corresponds to VRPLib's
+///   `EDGE_WEIGHT_TYPE = EUC_2D`.
+/// - `Euc2DExact`: Edge weights are computed as the exact (non-rounded)
+///   Euclidean distance between 2D coordinates. Used for Solomon instances.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum EdgeWeightKind {
     LowerRow,
     FullMatrix,
     Euc2D,
+    Euc2DExact,
 }
 
 impl EdgeWeightKind {
