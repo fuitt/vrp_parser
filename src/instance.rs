@@ -99,6 +99,22 @@ pub enum ValidationError {
     MissingServiceTimes,
     #[error("invalid demands length")]
     InvalidDemandsLength,
+    #[error("non-positive capacity")]
+    NonPositiveCapacity,
+    #[error("negative demand")]
+    NegativeDemand,
+    #[error("invalid depot index")]
+    InvalidDepotIndex,
+    #[error("invalid time windows length")]
+    InvalidTimeWindowsLength,
+    #[error("negative time window value")]
+    NegativeTimeWindow,
+    #[error("invalid time window: ready time exceeds due date")]
+    InvalidTimeWindow,
+    #[error("invalid service times length")]
+    InvalidServiceTimesLength,
+    #[error("negative service time")]
+    NegativeServiceTime,
 }
 
 impl<T: Numeric> VrpInstanceBuilder<T> {
@@ -200,6 +216,13 @@ impl<T: Numeric> VrpInstanceBuilder<T> {
         }
         Ok(())
     }
+
+    fn validate_depot_indices(&self) -> Result<(), ValidationError> {
+        if self.depots.iter().any(|&d| d >= self.dimension) {
+            return Err(ValidationError::InvalidDepotIndex);
+        }
+        Ok(())
+    }
 }
 
 impl VrpInstanceBuilder<f64> {
@@ -222,6 +245,13 @@ impl VrpInstanceBuilder<f64> {
 }
 
 impl VrpInstanceBuilder<u64> {
+    fn validate_capacity(&self) -> Result<(), ValidationError> {
+        if self.capacity == Some(0) {
+            return Err(ValidationError::NonPositiveCapacity);
+        }
+        Ok(())
+    }
+
     pub fn build(mut self) -> Result<VrpInstance<u64>, ValidationError> {
         let edge_weights = match self.edge_weight_kind {
             EdgeWeightKind::LowerRow => {
@@ -254,6 +284,7 @@ impl VrpInstanceBuilder<u64> {
         if self.depots.is_empty() {
             return Err(ValidationError::MissingDepots);
         }
+        self.validate_depot_indices()?;
 
         match self.problem_type {
             ProblemType::Cvrp => {
@@ -265,6 +296,7 @@ impl VrpInstanceBuilder<u64> {
                     .ok_or(ValidationError::MissingDemands)?;
 
                 self.validate_demands()?;
+                self.validate_capacity()?;
 
                 Ok(VrpInstance::new(
                     self.name,
@@ -286,6 +318,51 @@ impl VrpInstanceBuilder<u64> {
 }
 
 impl VrpInstanceBuilder<f64> {
+    fn validate_capacity(&self) -> Result<(), ValidationError> {
+        if self.capacity.is_some_and(|c| c <= 0.0) {
+            return Err(ValidationError::NonPositiveCapacity);
+        }
+        Ok(())
+    }
+
+    fn validate_demand_values(&self) -> Result<(), ValidationError> {
+        if let Some(demands) = &self.demands
+            && demands.iter().any(|&d| d < 0.0)
+        {
+            return Err(ValidationError::NegativeDemand);
+        }
+        Ok(())
+    }
+
+    fn validate_time_windows(&self) -> Result<(), ValidationError> {
+        if let Some(tws) = &self.time_windows {
+            if tws.len() != self.dimension {
+                return Err(ValidationError::InvalidTimeWindowsLength);
+            }
+            for &(ready, due) in tws {
+                if ready < 0.0 || due < 0.0 {
+                    return Err(ValidationError::NegativeTimeWindow);
+                }
+                if ready > due {
+                    return Err(ValidationError::InvalidTimeWindow);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_service_times(&self) -> Result<(), ValidationError> {
+        if let Some(times) = &self.service_times {
+            if times.len() != self.dimension {
+                return Err(ValidationError::InvalidServiceTimesLength);
+            }
+            if times.iter().any(|&t| t < 0.0) {
+                return Err(ValidationError::NegativeServiceTime);
+            }
+        }
+        Ok(())
+    }
+
     pub fn build(mut self) -> Result<VrpInstance<f64>, ValidationError> {
         let edge_weights = match self.edge_weight_kind {
             EdgeWeightKind::LowerRow => {
@@ -331,6 +408,7 @@ impl VrpInstanceBuilder<f64> {
         if self.depots.is_empty() {
             return Err(ValidationError::MissingDepots);
         }
+        self.validate_depot_indices()?;
 
         match self.problem_type {
             ProblemType::Cvrp => {
@@ -342,6 +420,8 @@ impl VrpInstanceBuilder<f64> {
                     .ok_or(ValidationError::MissingDemands)?;
 
                 self.validate_demands()?;
+                self.validate_capacity()?;
+                self.validate_demand_values()?;
 
                 Ok(VrpInstance::new(
                     self.name,
@@ -372,6 +452,10 @@ impl VrpInstanceBuilder<f64> {
                     .ok_or(ValidationError::MissingServiceTimes)?;
 
                 self.validate_demands()?;
+                self.validate_capacity()?;
+                self.validate_demand_values()?;
+                self.validate_time_windows()?;
+                self.validate_service_times()?;
 
                 Ok(VrpInstance::new(
                     self.name,
@@ -846,6 +930,157 @@ mod tests {
 
         let expected = ValidationError::MissingNodeCoords;
         assert_eq!(value, expected);
+    }
+
+    fn valid_cvrp_u64_builder() -> VrpInstanceBuilder<u64> {
+        VrpInstanceBuilder::<u64> {
+            name: "test".to_string(),
+            problem_type: ProblemType::Cvrp,
+            dimension: 3,
+            edge_weight_kind: EdgeWeightKind::LowerRow,
+            depots: vec![1],
+            capacity: Some(20),
+            demands: Some(vec![0, 11, 12]),
+            node_coords: None,
+            edge_weights: Some(vec![vec![4], vec![5, 6]]),
+            time_windows: None,
+            service_times: None,
+            vehicle_count: None,
+        }
+    }
+
+    fn valid_cvrp_f64_builder() -> VrpInstanceBuilder<f64> {
+        VrpInstanceBuilder::<f64> {
+            name: "test".to_string(),
+            problem_type: ProblemType::Cvrp,
+            dimension: 3,
+            edge_weight_kind: EdgeWeightKind::LowerRow,
+            depots: vec![1],
+            capacity: Some(20.0),
+            demands: Some(vec![0.0, 11.0, 12.0]),
+            node_coords: None,
+            edge_weights: Some(vec![vec![4.0], vec![5.0, 6.0]]),
+            time_windows: None,
+            service_times: None,
+            vehicle_count: None,
+        }
+    }
+
+    fn valid_cvrptw_builder() -> VrpInstanceBuilder<f64> {
+        VrpInstanceBuilder::<f64> {
+            name: "test".to_string(),
+            problem_type: ProblemType::Cvrptw,
+            dimension: 3,
+            edge_weight_kind: EdgeWeightKind::FullMatrix,
+            depots: vec![0],
+            capacity: Some(200.0),
+            demands: Some(vec![0.0, 10.0, 30.0]),
+            node_coords: None,
+            edge_weights: Some(vec![
+                vec![0.0, 10.0, 20.0],
+                vec![10.0, 0.0, 15.0],
+                vec![20.0, 15.0, 0.0],
+            ]),
+            time_windows: Some(vec![(0.0, 1000.0), (100.0, 200.0), (50.0, 150.0)]),
+            service_times: Some(vec![0.0, 10.0, 10.0]),
+            vehicle_count: Some(2),
+        }
+    }
+
+    #[test]
+    fn test_build_fails_if_zero_capacity() {
+        let mut sut = valid_cvrp_u64_builder();
+        sut.capacity = Some(0);
+
+        let value = sut.build().unwrap_err();
+
+        assert_eq!(value, ValidationError::NonPositiveCapacity);
+    }
+
+    #[test]
+    fn test_build_f64_fails_if_non_positive_capacity() {
+        let mut sut = valid_cvrp_f64_builder();
+        sut.capacity = Some(0.0);
+
+        let value = sut.build().unwrap_err();
+
+        assert_eq!(value, ValidationError::NonPositiveCapacity);
+    }
+
+    #[test]
+    fn test_build_f64_fails_if_negative_demand() {
+        let mut sut = valid_cvrp_f64_builder();
+        sut.demands = Some(vec![0.0, -1.0, 12.0]);
+
+        let value = sut.build().unwrap_err();
+
+        assert_eq!(value, ValidationError::NegativeDemand);
+    }
+
+    #[test]
+    fn test_build_fails_if_invalid_depot_index() {
+        let mut sut = valid_cvrp_u64_builder();
+        sut.depots = vec![5]; // index 5 >= dimension 3
+
+        let value = sut.build().unwrap_err();
+
+        assert_eq!(value, ValidationError::InvalidDepotIndex);
+    }
+
+    #[test]
+    fn test_build_f64_cvrptw_succeeds() {
+        let sut = valid_cvrptw_builder();
+        assert!(sut.build().is_ok());
+    }
+
+    #[test]
+    fn test_build_f64_fails_if_invalid_time_windows_length() {
+        let mut sut = valid_cvrptw_builder();
+        sut.time_windows = Some(vec![(0.0, 100.0)]); // wrong length
+
+        let value = sut.build().unwrap_err();
+
+        assert_eq!(value, ValidationError::InvalidTimeWindowsLength);
+    }
+
+    #[test]
+    fn test_build_f64_fails_if_negative_time_window_value() {
+        let mut sut = valid_cvrptw_builder();
+        sut.time_windows = Some(vec![(-1.0, 1000.0), (100.0, 200.0), (50.0, 150.0)]);
+
+        let value = sut.build().unwrap_err();
+
+        assert_eq!(value, ValidationError::NegativeTimeWindow);
+    }
+
+    #[test]
+    fn test_build_f64_fails_if_invalid_time_window_ordering() {
+        let mut sut = valid_cvrptw_builder();
+        sut.time_windows = Some(vec![(0.0, 1000.0), (200.0, 100.0), (50.0, 150.0)]);
+
+        let value = sut.build().unwrap_err();
+
+        assert_eq!(value, ValidationError::InvalidTimeWindow);
+    }
+
+    #[test]
+    fn test_build_f64_fails_if_invalid_service_times_length() {
+        let mut sut = valid_cvrptw_builder();
+        sut.service_times = Some(vec![0.0]); // wrong length
+
+        let value = sut.build().unwrap_err();
+
+        assert_eq!(value, ValidationError::InvalidServiceTimesLength);
+    }
+
+    #[test]
+    fn test_build_f64_fails_if_negative_service_time() {
+        let mut sut = valid_cvrptw_builder();
+        sut.service_times = Some(vec![0.0, -1.0, 10.0]);
+
+        let value = sut.build().unwrap_err();
+
+        assert_eq!(value, ValidationError::NegativeServiceTime);
     }
 
     #[test]
