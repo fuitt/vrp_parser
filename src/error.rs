@@ -20,8 +20,8 @@ pub enum LoadError {
 
     /// A VRPLib-specific error occurred during tokenization or parsing.
     ///
-    /// Holds either a [`VrplibError::Token`] from the lexical analysis stage
-    /// or a [`VrplibError::Parse`] from the structural parsing stage.
+    /// This variant is returned when the file does not conform to the
+    /// expected VRPLib layout.
     #[error("vrplib error: {0}")]
     Vrplib(#[from] VrplibError),
 
