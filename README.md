@@ -1,31 +1,42 @@
 # vrp_parser
-A VRPLib parser for Rust.
-Loads VRPLib-formatted files and constructs `VRPInstance` values.
+A VRP instance file parser for Rust.
+Loads VRPLib and Solomon-formatted files and constructs `VrpInstance` values.
 
-## Example
+## Supported formats
+
+| Format  | Function                  | Problem type |
+|---------|---------------------------|--------------|
+| VRPLib  | `read_from_vrplib`        | CVRP (`u64` weights) |
+| VRPLib  | `read_from_vrplib_f64`    | CVRP (`f64` weights) |
+| Solomon | `read_from_solomon_f64`   | CVRPTW (`f64` weights, exact Euclidean distances) |
+
+## Examples
+
 ```rust
-// Load with integer (u64) numeric values
+// VRPLib — integer weights
 let instance = vrp_parser::read_from_vrplib("example.vrp")?;
 
-// Load with floating-point (f64) numeric values
+// VRPLib — floating-point weights
 let instance = vrp_parser::read_from_vrplib_f64("example.vrp")?;
+
+// Solomon — CVRPTW with exact Euclidean distances
+let instance = vrp_parser::read_from_solomon_f64("example.txt")?;
 ```
 
 ## Installation
+
 ```toml
-vrp_parser = "0.1"
+vrp_parser = "0.2"
 ```
 
-## Status
-This is an early release (v0.1.1).
+## Supported VRPLib sections
 
-Currently supported VRPLib sections:
 - NAME
 - TYPE (CVRP only)
 - COMMENT
 - DIMENSION
-- EDGE_WEIGHT_TYPE (EXPLICIT and EUC_2D only)
-- EDGE_WEIGHT_FORMAT (LOWER_ROW only)
+- EDGE_WEIGHT_TYPE (EXPLICIT and EUC_2D)
+- EDGE_WEIGHT_FORMAT (LOWER_ROW and FULL_MATRIX)
 - EDGE_WEIGHT_SECTION
 - NODE_COORD_TYPE (TWOD_COORDS only)
 - NODE_COORD_SECTION
