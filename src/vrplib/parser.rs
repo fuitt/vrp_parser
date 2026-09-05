@@ -1,10 +1,10 @@
 use crate::Numeric;
 use crate::ProblemType;
 
-use super::NodeCoordType;
 use super::Token;
-use super::edge_weight_format::EdgeWeightFormat;
-use super::edge_weight_type::EdgeWeightType;
+use super::types::edge_weight_format::EdgeWeightFormat;
+use super::types::edge_weight_type::EdgeWeightType;
+use super::types::node_coord_type::NodeCoordType;
 
 enum State {
     Header,
@@ -25,11 +25,11 @@ pub(crate) struct SectionData<T> {
     pub edge_weights: Vec<Vec<T>>,
     pub node_coord_type: Option<NodeCoordType>,
     pub node_coords: Vec<Vec<f64>>,
-    pub demands: Vec<Vec<T>>,
-    pub depots: Vec<Vec<usize>>,
+    pub demands: Vec<T>,
+    pub depots: Vec<usize>,
 }
 
-#[derive(Debug, PartialEq, thiserror::Error)]
+#[derive(Debug, Eq, PartialEq, thiserror::Error)]
 pub enum ParseError {
     #[error("missing name")]
     MissingName,
@@ -48,6 +48,24 @@ pub enum ParseError {
 
     #[error("missing node coord type")]
     MissingNodeCoordType,
+
+    #[error("invalid problem type")]
+    InvalidProblemType,
+
+    #[error("invalid dimension")]
+    InvalidDimension,
+
+    #[error("invalid edge weight type")]
+    InvalidEdgeWeightType,
+
+    #[error("invalid edge weight format")]
+    InvalidEdgeWeightFormat,
+
+    #[error("invalid node coord type")]
+    InvalidNodeCoordType,
+
+    #[error("invalid capacity")]
+    InvalidCapacity,
 
     #[error("invalid edge weight")]
     EdgeWeight,
@@ -77,12 +95,39 @@ fn parse_tokens<T: Numeric>(tokens: &[Token]) -> Result<SectionData<T>, ParseErr
         match token {
             Token::Name(s) => data.name = Some(s.to_string()),
             Token::Comment(_) => {}
-            Token::Type(t) => data.problem_type = Some(*t),
-            Token::Dimension(d) => data.dimension = Some(*d),
-            Token::Capacity(c) => data.capacity = Some(T::from_u64(*c)),
-            Token::EdgeWeightType(t) => data.edge_weight_type = Some(*t),
-            Token::EdgeWeightFormat(f) => data.edge_weight_format = Some(*f),
-            Token::NodeCoordType(t) => data.node_coord_type = Some(*t),
+            Token::Type(s) => {
+                data.problem_type = Some(
+                    ProblemType::try_from(s.as_str())
+                        .map_err(|_| ParseError::InvalidProblemType)?,
+                );
+            }
+            Token::Dimension(s) => {
+                data.dimension = Some(
+                    s.parse::<usize>()
+                        .map_err(|_| ParseError::InvalidDimension)?,
+                );
+            }
+            Token::Capacity(s) => {
+                data.capacity = Some(s.parse::<T>().map_err(|_| ParseError::InvalidCapacity)?);
+            }
+            Token::EdgeWeightType(s) => {
+                data.edge_weight_type = Some(
+                    EdgeWeightType::try_from(s.as_str())
+                        .map_err(|_| ParseError::InvalidEdgeWeightType)?,
+                );
+            }
+            Token::EdgeWeightFormat(s) => {
+                data.edge_weight_format = Some(
+                    EdgeWeightFormat::try_from(s.as_str())
+                        .map_err(|_| ParseError::InvalidEdgeWeightFormat)?,
+                );
+            }
+            Token::NodeCoordType(s) => {
+                data.node_coord_type = Some(
+                    NodeCoordType::try_from(s.as_str())
+                        .map_err(|_| ParseError::InvalidNodeCoordType)?,
+                );
+            }
             Token::EdgeWeightSection => state = State::EdgeWeightSection,
             Token::NodeCoordSection => state = State::NodeCoordSection,
             Token::DemandSection => state = State::DemandSection,
@@ -119,22 +164,25 @@ fn parse_tokens<T: Numeric>(tokens: &[Token]) -> Result<SectionData<T>, ParseErr
                     }
                 }
                 State::DemandSection => {
-                    match d
-                        .iter()
-                        .map(|x| x.parse::<T>())
-                        .collect::<Result<Vec<_>, _>>()
-                    {
-                        Ok(demands) => data.demands.push(demands),
+                    if d.len() != 2 {
+                        return Err(ParseError::Demand);
+                    }
+                    let expected_index = data.demands.len() + 1;
+                    match d[0].parse::<usize>() {
+                        Ok(idx) if idx == expected_index => {}
+                        _ => return Err(ParseError::Demand),
+                    }
+                    match d[1].parse::<T>() {
+                        Ok(demand) => data.demands.push(demand),
                         Err(_) => return Err(ParseError::Demand),
                     }
                 }
                 State::DepotSection => {
-                    match d
-                        .iter()
-                        .map(|x| x.parse::<usize>())
-                        .collect::<Result<Vec<_>, _>>()
-                    {
-                        Ok(depots) => data.depots.push(depots),
+                    if d.len() != 1 {
+                        return Err(ParseError::Depot);
+                    }
+                    match d[0].parse::<usize>() {
+                        Ok(depot) => data.depots.push(depot),
                         Err(_) => return Err(ParseError::Depot),
                     }
                 }
@@ -202,6 +250,17 @@ fn validate_edge_weights<T>(
                             Err(ParseError::EdgeWeight)
                         }
                     }
+                    EdgeWeightFormat::FullMatrix => {
+                        if dimension == edge_weights.len()
+                            && edge_weights
+                                .iter()
+                                .all(|weights| dimension == weights.len())
+                        {
+                            Ok(())
+                        } else {
+                            Err(ParseError::EdgeWeight)
+                        }
+                    }
                 }
             } else {
                 Err(ParseError::MissingEdgeWeightFormat)
@@ -250,24 +309,16 @@ fn is_2d_coords(dimension: usize, node_coords: &[Vec<f64>]) -> bool {
     dimension == node_coords.len() && node_coords.iter().all(|coords| coords.len() == 2)
 }
 
-fn validate_demands<T: Numeric>(dimension: usize, demands: &[Vec<T>]) -> Result<(), ParseError> {
-    if dimension == demands.len()
-        && demands
-            .iter()
-            .enumerate()
-            .all(|(i, demand)| demand.len() == 2 && i + 1 == demand[0].as_usize())
-    {
+fn validate_demands<T>(dimension: usize, demands: &[T]) -> Result<(), ParseError> {
+    if demands.len() == dimension {
         Ok(())
     } else {
         Err(ParseError::Demand)
     }
 }
 
-fn validate_depots(dimension: usize, depots: &[Vec<usize>]) -> Result<(), ParseError> {
-    if depots
-        .iter()
-        .all(|depot| depot.len() == 1 && 1 <= depot[0] && depot[0] <= dimension)
-    {
+fn validate_depots(dimension: usize, depots: &[usize]) -> Result<(), ParseError> {
+    if depots.iter().all(|&depot| 1 <= depot && depot <= dimension) {
         Ok(())
     } else {
         Err(ParseError::Depot)
@@ -284,12 +335,12 @@ mod tests {
         let sut = vec![
             Token::Name("This is a name.".to_string()),
             Token::Comment("This is a comment.".to_string()),
-            Token::Type(ProblemType::CVRP),
-            Token::Dimension(3),
-            Token::EdgeWeightType(EdgeWeightType::Explicit),
-            Token::EdgeWeightFormat(EdgeWeightFormat::LowerRow),
-            Token::NodeCoordType(NodeCoordType::TwodCoords),
-            Token::Capacity(2),
+            Token::Type("CVRP".to_string()),
+            Token::Dimension("3".to_string()),
+            Token::EdgeWeightType("EXPLICIT".to_string()),
+            Token::EdgeWeightFormat("LOWER_ROW".to_string()),
+            Token::NodeCoordType("TWOD_COORDS".to_string()),
+            Token::Capacity("2".to_string()),
             Token::EdgeWeightSection,
             Token::Data(vec!["4".to_string()]),
             Token::Data(vec!["5".to_string(), "6".to_string()]),
@@ -309,7 +360,7 @@ mod tests {
 
         let expected = SectionData::<u64> {
             name: Some("This is a name.".to_string()),
-            problem_type: Some(ProblemType::CVRP),
+            problem_type: Some(ProblemType::Cvrp),
             dimension: Some(3),
             edge_weight_type: Some(EdgeWeightType::Explicit),
             edge_weight_format: Some(EdgeWeightFormat::LowerRow),
@@ -317,8 +368,8 @@ mod tests {
             capacity: Some(2),
             edge_weights: vec![vec![4], vec![5, 6]],
             node_coords: vec![vec![0.0, 0.0], vec![7.0, 8.0], vec![9.0, 10.0]],
-            demands: vec![vec![1, 0], vec![2, 11], vec![3, 12]],
-            depots: vec![vec![1]],
+            demands: vec![0, 11, 12],
+            depots: vec![1],
         };
         assert_eq!(value, expected);
     }
@@ -328,14 +379,14 @@ mod tests {
         let sut = vec![
             Token::Name("This is a name.".to_string()),
             Token::Comment("This is a comment.".to_string()),
-            Token::Type(ProblemType::CVRP),
-            Token::Dimension(3),
-            Token::EdgeWeightType(EdgeWeightType::Explicit),
-            Token::EdgeWeightFormat(EdgeWeightFormat::LowerRow),
-            Token::NodeCoordType(NodeCoordType::TwodCoords),
-            Token::Capacity(2),
+            Token::Type("CVRP".to_string()),
+            Token::Dimension("3".to_string()),
+            Token::EdgeWeightType("EXPLICIT".to_string()),
+            Token::EdgeWeightFormat("LOWER_ROW".to_string()),
+            Token::NodeCoordType("TWOD_COORDS".to_string()),
+            Token::Capacity("2".to_string()),
             Token::EdgeWeightSection,
-            Token::Data(vec!["A".to_string()]), // not a nubmer
+            Token::Data(vec!["A".to_string()]), // not a number
             Token::Data(vec!["5".to_string(), "6".to_string()]),
             Token::NodeCoordSection,
             Token::Data(vec!["1".to_string(), "0".to_string(), "0".to_string()]),
@@ -361,12 +412,12 @@ mod tests {
         let sut = vec![
             Token::Name("This is a name.".to_string()),
             Token::Comment("This is a comment.".to_string()),
-            Token::Type(ProblemType::CVRP),
-            Token::Dimension(3),
-            Token::EdgeWeightType(EdgeWeightType::Explicit),
-            Token::EdgeWeightFormat(EdgeWeightFormat::LowerRow),
-            Token::NodeCoordType(NodeCoordType::TwodCoords),
-            Token::Capacity(2),
+            Token::Type("CVRP".to_string()),
+            Token::Dimension("3".to_string()),
+            Token::EdgeWeightType("EXPLICIT".to_string()),
+            Token::EdgeWeightFormat("LOWER_ROW".to_string()),
+            Token::NodeCoordType("TWOD_COORDS".to_string()),
+            Token::Capacity("2".to_string()),
             Token::EdgeWeightSection,
             Token::Data(vec!["4".to_string()]),
             Token::Data(vec!["5".to_string(), "6".to_string()]),
@@ -394,12 +445,12 @@ mod tests {
         let sut = vec![
             Token::Name("This is a name.".to_string()),
             Token::Comment("This is a comment.".to_string()),
-            Token::Type(ProblemType::CVRP),
-            Token::Dimension(3),
-            Token::EdgeWeightType(EdgeWeightType::Explicit),
-            Token::EdgeWeightFormat(EdgeWeightFormat::LowerRow),
-            Token::NodeCoordType(NodeCoordType::TwodCoords),
-            Token::Capacity(2),
+            Token::Type("CVRP".to_string()),
+            Token::Dimension("3".to_string()),
+            Token::EdgeWeightType("EXPLICIT".to_string()),
+            Token::EdgeWeightFormat("LOWER_ROW".to_string()),
+            Token::NodeCoordType("TWOD_COORDS".to_string()),
+            Token::Capacity("2".to_string()),
             Token::EdgeWeightSection,
             Token::Data(vec!["4".to_string()]),
             Token::Data(vec!["5".to_string(), "6".to_string()]),
@@ -427,12 +478,12 @@ mod tests {
         let sut = vec![
             Token::Name("This is a name.".to_string()),
             Token::Comment("This is a comment.".to_string()),
-            Token::Type(ProblemType::CVRP),
-            Token::Dimension(3),
-            Token::EdgeWeightType(EdgeWeightType::Explicit),
-            Token::EdgeWeightFormat(EdgeWeightFormat::LowerRow),
-            Token::NodeCoordType(NodeCoordType::TwodCoords),
-            Token::Capacity(2),
+            Token::Type("CVRP".to_string()),
+            Token::Dimension("3".to_string()),
+            Token::EdgeWeightType("EXPLICIT".to_string()),
+            Token::EdgeWeightFormat("LOWER_ROW".to_string()),
+            Token::NodeCoordType("TWOD_COORDS".to_string()),
+            Token::Capacity("2".to_string()),
             Token::EdgeWeightSection,
             Token::Data(vec!["4".to_string()]),
             Token::Data(vec!["5".to_string(), "6".to_string()]),
@@ -459,7 +510,7 @@ mod tests {
     fn test_validate_format_succeeds() {
         let sut = SectionData::<u64> {
             name: Some("This is a name.".to_string()),
-            problem_type: Some(ProblemType::CVRP),
+            problem_type: Some(ProblemType::Cvrp),
             dimension: Some(3),
             edge_weight_type: Some(EdgeWeightType::Explicit),
             edge_weight_format: Some(EdgeWeightFormat::LowerRow),
@@ -467,8 +518,8 @@ mod tests {
             capacity: Some(2),
             edge_weights: vec![vec![4], vec![5, 6]],
             node_coords: vec![vec![0.0, 0.0], vec![7.0, 8.0], vec![9.0, 10.0]],
-            demands: vec![vec![1, 0], vec![2, 11], vec![3, 12]],
-            depots: vec![vec![1]],
+            demands: vec![0, 11, 12],
+            depots: vec![1],
         };
 
         let value = validate_format(&sut);
@@ -481,7 +532,7 @@ mod tests {
     fn test_validate_format_fails_if_missing_name() {
         let sut = SectionData::<u64> {
             name: None,
-            problem_type: Some(ProblemType::CVRP),
+            problem_type: Some(ProblemType::Cvrp),
             dimension: Some(3),
             edge_weight_type: Some(EdgeWeightType::Explicit),
             edge_weight_format: Some(EdgeWeightFormat::LowerRow),
@@ -489,8 +540,8 @@ mod tests {
             capacity: Some(2),
             edge_weights: vec![vec![4], vec![5, 6]],
             node_coords: vec![vec![0.0, 0.0], vec![7.0, 8.0], vec![9.0, 10.0]],
-            demands: vec![vec![1, 0], vec![2, 11], vec![3, 12]],
-            depots: vec![vec![1]],
+            demands: vec![0, 11, 12],
+            depots: vec![1],
         };
 
         let value = validate_format(&sut);
@@ -511,8 +562,8 @@ mod tests {
             capacity: Some(2),
             edge_weights: vec![vec![4], vec![5, 6]],
             node_coords: vec![vec![0.0, 0.0], vec![7.0, 8.0], vec![9.0, 10.0]],
-            demands: vec![vec![1, 0], vec![2, 11], vec![3, 12]],
-            depots: vec![vec![1]],
+            demands: vec![0, 11, 12],
+            depots: vec![1],
         };
 
         let value = validate_format(&sut);
@@ -525,7 +576,7 @@ mod tests {
     fn test_validate_format_fails_if_missing_dimension() {
         let sut = SectionData::<u64> {
             name: Some("This is a name.".to_string()),
-            problem_type: Some(ProblemType::CVRP),
+            problem_type: Some(ProblemType::Cvrp),
             dimension: None,
             edge_weight_type: Some(EdgeWeightType::Explicit),
             edge_weight_format: Some(EdgeWeightFormat::LowerRow),
@@ -533,8 +584,8 @@ mod tests {
             capacity: Some(2),
             edge_weights: vec![vec![4], vec![5, 6]],
             node_coords: vec![vec![0.0, 0.0], vec![7.0, 8.0], vec![9.0, 10.0]],
-            demands: vec![vec![1, 0], vec![2, 11], vec![3, 12]],
-            depots: vec![vec![1]],
+            demands: vec![0, 11, 12],
+            depots: vec![1],
         };
 
         let value = validate_format(&sut);
@@ -547,7 +598,7 @@ mod tests {
     fn test_validate_format_fails_if_missing_edge_weight_type() {
         let sut = SectionData::<u64> {
             name: Some("This is a name.".to_string()),
-            problem_type: Some(ProblemType::CVRP),
+            problem_type: Some(ProblemType::Cvrp),
             dimension: Some(3),
             edge_weight_type: None,
             edge_weight_format: Some(EdgeWeightFormat::LowerRow),
@@ -555,8 +606,8 @@ mod tests {
             capacity: Some(2),
             edge_weights: vec![vec![4], vec![5, 6]],
             node_coords: vec![vec![0.0, 0.0], vec![7.0, 8.0], vec![9.0, 10.0]],
-            demands: vec![vec![1, 0], vec![2, 11], vec![3, 12]],
-            depots: vec![vec![1]],
+            demands: vec![0, 11, 12],
+            depots: vec![1],
         };
 
         let value = validate_format(&sut);
@@ -569,7 +620,7 @@ mod tests {
     fn test_validate_format_fails_if_missing_edge_weight_format() {
         let sut = SectionData::<u64> {
             name: Some("This is a name.".to_string()),
-            problem_type: Some(ProblemType::CVRP),
+            problem_type: Some(ProblemType::Cvrp),
             dimension: Some(3),
             edge_weight_type: Some(EdgeWeightType::Explicit),
             edge_weight_format: None,
@@ -577,8 +628,8 @@ mod tests {
             capacity: Some(2),
             edge_weights: vec![vec![4], vec![5, 6]],
             node_coords: vec![vec![0.0, 0.0], vec![7.0, 8.0], vec![9.0, 10.0]],
-            demands: vec![vec![1, 0], vec![2, 11], vec![3, 12]],
-            depots: vec![vec![1]],
+            demands: vec![0, 11, 12],
+            depots: vec![1],
         };
 
         let value = validate_format(&sut);
@@ -591,7 +642,7 @@ mod tests {
     fn test_validate_format_fails_if_edge_weights_are_invalid() {
         let sut = SectionData::<u64> {
             name: Some("This is a name.".to_string()),
-            problem_type: Some(ProblemType::CVRP),
+            problem_type: Some(ProblemType::Cvrp),
             dimension: Some(3),
             edge_weight_type: Some(EdgeWeightType::Explicit),
             edge_weight_format: Some(EdgeWeightFormat::LowerRow),
@@ -599,8 +650,8 @@ mod tests {
             capacity: Some(2),
             edge_weights: vec![vec![4, 5], vec![6]], // not lower row
             node_coords: vec![vec![0.0, 0.0], vec![7.0, 8.0], vec![9.0, 10.0]],
-            demands: vec![vec![1, 0], vec![2, 11], vec![3, 12]],
-            depots: vec![vec![1]],
+            demands: vec![0, 11, 12],
+            depots: vec![1],
         };
 
         let value = validate_format(&sut);
@@ -613,7 +664,7 @@ mod tests {
     fn test_validate_format_fails_if_node_coords_are_invalid() {
         let sut = SectionData::<u64> {
             name: Some("This is a name.".to_string()),
-            problem_type: Some(ProblemType::CVRP),
+            problem_type: Some(ProblemType::Cvrp),
             dimension: Some(3),
             edge_weight_type: Some(EdgeWeightType::Explicit),
             edge_weight_format: Some(EdgeWeightFormat::LowerRow),
@@ -625,8 +676,8 @@ mod tests {
                 vec![7.0, 8.0, 0.0],
                 vec![9.0, 10.0, 0.0],
             ], // 3D coords
-            demands: vec![vec![1, 0], vec![2, 11], vec![3, 12]],
-            depots: vec![vec![1]],
+            demands: vec![0, 11, 12],
+            depots: vec![1],
         };
 
         let value = validate_format(&sut);
@@ -639,7 +690,7 @@ mod tests {
     fn test_validate_format_fails_if_node_coords_type_not_given() {
         let sut = SectionData::<u64> {
             name: Some("This is a name.".to_string()),
-            problem_type: Some(ProblemType::CVRP),
+            problem_type: Some(ProblemType::Cvrp),
             dimension: Some(3),
             edge_weight_type: Some(EdgeWeightType::Explicit),
             edge_weight_format: Some(EdgeWeightFormat::LowerRow),
@@ -647,8 +698,8 @@ mod tests {
             capacity: Some(2),
             edge_weights: vec![vec![4], vec![5, 6]],
             node_coords: vec![vec![0.0, 0.0], vec![7.0, 8.0], vec![9.0, 10.0]],
-            demands: vec![vec![1, 0], vec![2, 11], vec![3, 12]],
-            depots: vec![vec![1]],
+            demands: vec![0, 11, 12],
+            depots: vec![1],
         };
 
         let value = validate_format(&sut);
@@ -661,7 +712,7 @@ mod tests {
     fn test_validate_format_fails_if_node_coords_are_invalid_euc2d() {
         let sut = SectionData::<u64> {
             name: Some("This is a name.".to_string()),
-            problem_type: Some(ProblemType::CVRP),
+            problem_type: Some(ProblemType::Cvrp),
             dimension: Some(3),
             edge_weight_type: Some(EdgeWeightType::Euc2D),
             edge_weight_format: None,
@@ -673,8 +724,8 @@ mod tests {
                 vec![7.0, 8.0, 0.0],
                 vec![9.0, 10.0, 0.0],
             ], // 3D coords
-            demands: vec![vec![1, 0], vec![2, 11], vec![3, 12]],
-            depots: vec![vec![1]],
+            demands: vec![0, 11, 12],
+            depots: vec![1],
         };
 
         let value = validate_format(&sut);
@@ -684,10 +735,52 @@ mod tests {
     }
 
     #[test]
+    fn test_validate_format_succeeds_full_matrix() {
+        let sut = SectionData::<u64> {
+            name: Some("This is a name.".to_string()),
+            problem_type: Some(ProblemType::Cvrp),
+            dimension: Some(3),
+            edge_weight_type: Some(EdgeWeightType::Explicit),
+            edge_weight_format: Some(EdgeWeightFormat::FullMatrix),
+            node_coord_type: Some(NodeCoordType::TwodCoords),
+            capacity: Some(2),
+            edge_weights: vec![vec![0, 4, 5], vec![4, 0, 6], vec![5, 6, 0]],
+            node_coords: vec![vec![0.0, 0.0], vec![7.0, 8.0], vec![9.0, 10.0]],
+            demands: vec![0, 11, 12],
+            depots: vec![1],
+        };
+
+        let value = validate_format(&sut);
+
+        assert_eq!(value, Ok(()));
+    }
+
+    #[test]
+    fn test_validate_format_fails_if_full_matrix_edge_weights_are_invalid() {
+        let sut = SectionData::<u64> {
+            name: Some("This is a name.".to_string()),
+            problem_type: Some(ProblemType::Cvrp),
+            dimension: Some(3),
+            edge_weight_type: Some(EdgeWeightType::Explicit),
+            edge_weight_format: Some(EdgeWeightFormat::FullMatrix),
+            node_coord_type: Some(NodeCoordType::TwodCoords),
+            capacity: Some(2),
+            edge_weights: vec![vec![0, 4, 5], vec![4, 0, 6]], // missing one row
+            node_coords: vec![vec![0.0, 0.0], vec![7.0, 8.0], vec![9.0, 10.0]],
+            demands: vec![0, 11, 12],
+            depots: vec![1],
+        };
+
+        let value = validate_format(&sut);
+
+        assert_eq!(value, Err(ParseError::EdgeWeight));
+    }
+
+    #[test]
     fn test_validate_format_fails_if_demands_are_invalid() {
         let sut = SectionData::<u64> {
             name: Some("This is a name.".to_string()),
-            problem_type: Some(ProblemType::CVRP),
+            problem_type: Some(ProblemType::Cvrp),
             dimension: Some(3),
             edge_weight_type: Some(EdgeWeightType::Explicit),
             edge_weight_format: Some(EdgeWeightFormat::LowerRow),
@@ -695,8 +788,8 @@ mod tests {
             capacity: Some(2),
             edge_weights: vec![vec![4], vec![5, 6]],
             node_coords: vec![vec![0.0, 0.0], vec![7.0, 8.0], vec![9.0, 10.0]],
-            demands: vec![vec![1, 0], vec![2, 11], vec![3, 12, 0]], // len != 2
-            depots: vec![vec![1]],
+            demands: vec![0, 11], // wrong count (2 instead of 3)
+            depots: vec![1],
         };
 
         let value = validate_format(&sut);
@@ -709,7 +802,7 @@ mod tests {
     fn test_validate_format_fails_if_depots_are_invalid() {
         let sut = SectionData::<u64> {
             name: Some("This is a name.".to_string()),
-            problem_type: Some(ProblemType::CVRP),
+            problem_type: Some(ProblemType::Cvrp),
             dimension: Some(3),
             edge_weight_type: Some(EdgeWeightType::Explicit),
             edge_weight_format: Some(EdgeWeightFormat::LowerRow),
@@ -717,8 +810,8 @@ mod tests {
             capacity: Some(2),
             edge_weights: vec![vec![4], vec![5, 6]],
             node_coords: vec![vec![0.0, 0.0], vec![7.0, 8.0], vec![9.0, 10.0]],
-            demands: vec![vec![1, 0], vec![2, 11], vec![3, 12]],
-            depots: vec![vec![]], // is empty
+            demands: vec![0, 11, 12],
+            depots: vec![0], // out of range (depots are 1-indexed)
         };
 
         let value = validate_format(&sut);

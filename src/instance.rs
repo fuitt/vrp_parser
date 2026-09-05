@@ -1,12 +1,15 @@
 use crate::EdgeWeightKind;
 use crate::Numeric;
 use crate::ProblemType;
-use crate::common::edge_weight::{edge_weight_by_euc2d, edge_weight_by_euc2d_f64};
-use crate::common::matrix::expand_lower_row;
+use crate::solomon::parser::SolomonData;
+use crate::util::edge_weight::{
+    edge_weight_by_euc2d, edge_weight_by_euc2d_f64, euclidean_distance,
+};
+use crate::util::matrix::expand_lower_row;
 use crate::vrplib::parser::SectionData;
 
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct VRPInstanceBuilder<T> {
+pub(crate) struct VrpInstanceBuilder<T> {
     name: String,
     problem_type: ProblemType,
     edge_weight_kind: EdgeWeightKind,
@@ -16,46 +19,55 @@ pub(crate) struct VRPInstanceBuilder<T> {
     demands: Option<Vec<T>>,
     node_coords: Option<Vec<(f64, f64)>>,
     edge_weights: Option<Vec<Vec<T>>>,
+    time_windows: Option<Vec<(f64, f64)>>,
+    service_times: Option<Vec<f64>>,
+    vehicle_count: Option<usize>,
 }
 
 /// Represents a fully constructed Vehicle Routing Problem (VRP) instance
 /// loaded from a VRPLib file.
 ///
-/// A `VRPInstance<T>` contains all data required to describe a VRP, including
+/// A `VrpInstance<T>` contains all data required to describe a VRP, including
 /// problem metadata, node information, distance or cost matrices, and
 /// problem‑specific attributes such as vehicle capacity and customer demands.
 /// The type parameter `T` determines the numeric representation used for values
 /// such as edge weights and demands. Common choices include `u64` for standard
-/// VRPLib instances.
+/// VRPLib instances and `f64` for Solomon instances or fractional weights.
 ///
 /// This structure is created only after successful parsing and validation of
-/// a VRPLib file. All fields therefore represent a semantically consistent
+/// an instance file. All fields therefore represent a semantically consistent
 /// instance. Optional fields are present only for problem types that require
-/// them (e.g., capacity and demands for [`ProblemType::CVRP`]).
+/// them (e.g., capacity and demands for [`ProblemType::Cvrp`]; time windows,
+/// service times, and vehicle count for [`ProblemType::Cvrptw`]).
 ///
 /// Edge weights are stored as a fully expanded matrix, regardless of the
-/// original VRPLib representation.
+/// original format representation.
 ///
 /// # Type Parameters
 /// - `T`: The numeric type representing values such as edge weights and demands.
 ///   Typically:
 ///   - `u64`: The standard VRPLib-compliant integer representation.
-///   - `f64`: A floating-point representation for fractional weights and demands.
+///   - `f64`: A floating-point representation for fractional weights and demands,
+///     used by [`read_from_vrplib_f64`](crate::read_from_vrplib_f64) and
+///     [`read_from_solomon_f64`](crate::read_from_solomon_f64).
 ///
 /// # Fields
-/// - `name`: The instance name as specified in the VRPLib file.
+/// - `name`: The instance name.
 /// - `problem_type`: The VRP variant (see [`ProblemType`]).
 /// - `dimension`: The number of nodes in the instance.
 /// - `depots`: Indices of depot nodes.
 /// - `edge_weights`: A fully expanded distance or cost matrix.
 /// - `capacity`: Vehicle capacity (if applicable).
 /// - `demands`: Customer demands for each node (if applicable).
-/// - `node_coords`: Node coordinates (if provided in the VRPLib file).
+/// - `node_coords`: Node coordinates (if provided).
+/// - `time_windows`: Per-node `(ready_time, due_date)` pairs (CVRPTW only).
+/// - `service_times`: Per-node service durations (CVRPTW only).
+/// - `vehicle_count`: Number of available vehicles (Solomon instances only).
 ///
-/// A `VRPInstance` is immutable after construction and can be used directly
+/// A `VrpInstance` is immutable after construction and can be used directly
 /// by solvers, heuristics, or analysis tools.
 #[derive(Debug, Clone, PartialEq)]
-pub struct VRPInstance<T> {
+pub struct VrpInstance<T> {
     name: String,
     problem_type: ProblemType,
     dimension: usize,
@@ -64,9 +76,12 @@ pub struct VRPInstance<T> {
     capacity: Option<T>,
     demands: Option<Vec<T>>,
     node_coords: Option<Vec<(f64, f64)>>,
+    time_windows: Option<Vec<(f64, f64)>>,
+    service_times: Option<Vec<f64>>,
+    vehicle_count: Option<usize>,
 }
 
-#[derive(Debug, PartialEq, thiserror::Error)]
+#[derive(Debug, Eq, PartialEq, thiserror::Error)]
 pub enum ValidationError {
     #[error("missing capacity")]
     MissingCapacity,
@@ -78,11 +93,31 @@ pub enum ValidationError {
     MissingEdgeWeight,
     #[error("missing node coords")]
     MissingNodeCoords,
+    #[error("missing time windows")]
+    MissingTimeWindows,
+    #[error("missing service times")]
+    MissingServiceTimes,
     #[error("invalid demands length")]
     InvalidDemandsLength,
+    #[error("non-positive capacity")]
+    NonPositiveCapacity,
+    #[error("negative demand")]
+    NegativeDemand,
+    #[error("invalid depot index")]
+    InvalidDepotIndex,
+    #[error("invalid time windows length")]
+    InvalidTimeWindowsLength,
+    #[error("negative time window value")]
+    NegativeTimeWindow,
+    #[error("invalid time window: ready time exceeds due date")]
+    InvalidTimeWindow,
+    #[error("invalid service times length")]
+    InvalidServiceTimesLength,
+    #[error("negative service time")]
+    NegativeServiceTime,
 }
 
-impl<T: Numeric> VRPInstanceBuilder<T> {
+impl<T: Numeric> VrpInstanceBuilder<T> {
     pub fn new(
         name: String,
         problem_type: ProblemType,
@@ -99,6 +134,9 @@ impl<T: Numeric> VRPInstanceBuilder<T> {
             demands: None,
             node_coords: None,
             edge_weights: None,
+            time_windows: None,
+            service_times: None,
+            vehicle_count: None,
         }
     }
 
@@ -127,6 +165,21 @@ impl<T: Numeric> VRPInstanceBuilder<T> {
         self
     }
 
+    pub fn time_windows(mut self, time_windows: Option<Vec<(f64, f64)>>) -> Self {
+        self.time_windows = time_windows;
+        self
+    }
+
+    pub fn service_times(mut self, service_times: Option<Vec<f64>>) -> Self {
+        self.service_times = service_times;
+        self
+    }
+
+    pub fn vehicle_count(mut self, vehicle_count: Option<usize>) -> Self {
+        self.vehicle_count = vehicle_count;
+        self
+    }
+
     pub(crate) fn make_from_vrplib(section_data: SectionData<T>) -> Self {
         let name = section_data.name.unwrap();
         let edge_weight_kind = EdgeWeightKind::new(
@@ -134,12 +187,8 @@ impl<T: Numeric> VRPInstanceBuilder<T> {
             section_data.edge_weight_format,
         )
         .unwrap();
-        let depots = section_data.depots.iter().map(|depot| depot[0]).collect();
-        let demands = section_data
-            .demands
-            .iter()
-            .map(|demand| demand[1])
-            .collect();
+        let depots = section_data.depots;
+        let demands = section_data.demands;
         let node_coords = section_data
             .node_coords
             .iter()
@@ -167,10 +216,43 @@ impl<T: Numeric> VRPInstanceBuilder<T> {
         }
         Ok(())
     }
+
+    fn validate_depot_indices(&self) -> Result<(), ValidationError> {
+        if self.depots.iter().any(|&d| d >= self.dimension) {
+            return Err(ValidationError::InvalidDepotIndex);
+        }
+        Ok(())
+    }
 }
 
-impl VRPInstanceBuilder<u64> {
-    pub fn build(self) -> Result<VRPInstance<u64>, ValidationError> {
+impl VrpInstanceBuilder<f64> {
+    pub(crate) fn make_from_solomon(data: SolomonData) -> Self {
+        let dimension = data.node_coords.len();
+        Self::new(
+            data.name,
+            ProblemType::Cvrptw,
+            dimension,
+            EdgeWeightKind::Euc2DExact,
+        )
+        .depots(vec![0])
+        .capacity(Some(data.capacity))
+        .demands(Some(data.demands))
+        .node_coords(Some(data.node_coords))
+        .time_windows(Some(data.time_windows))
+        .service_times(Some(data.service_times))
+        .vehicle_count(Some(data.vehicle_count))
+    }
+}
+
+impl VrpInstanceBuilder<u64> {
+    fn validate_capacity(&self) -> Result<(), ValidationError> {
+        if self.capacity == Some(0) {
+            return Err(ValidationError::NonPositiveCapacity);
+        }
+        Ok(())
+    }
+
+    pub fn build(mut self) -> Result<VrpInstance<u64>, ValidationError> {
         let edge_weights = match self.edge_weight_kind {
             EdgeWeightKind::LowerRow => {
                 self.edge_weights
@@ -178,6 +260,10 @@ impl VRPInstanceBuilder<u64> {
                     .ok_or(ValidationError::MissingEdgeWeight)?;
                 expand_lower_row(self.edge_weights.as_ref().unwrap())
             }
+            EdgeWeightKind::FullMatrix => self
+                .edge_weights
+                .take()
+                .ok_or(ValidationError::MissingEdgeWeight)?,
             EdgeWeightKind::Euc2D => self
                 .node_coords
                 .as_ref()
@@ -192,14 +278,16 @@ impl VRPInstanceBuilder<u64> {
                         .collect()
                 })
                 .collect(),
+            EdgeWeightKind::Euc2DExact => unreachable!("Euc2DExact produces f64 weights"),
         };
 
         if self.depots.is_empty() {
             return Err(ValidationError::MissingDepots);
         }
+        self.validate_depot_indices()?;
 
         match self.problem_type {
-            ProblemType::CVRP => {
+            ProblemType::Cvrp => {
                 self.capacity
                     .as_ref()
                     .ok_or(ValidationError::MissingCapacity)?;
@@ -208,8 +296,9 @@ impl VRPInstanceBuilder<u64> {
                     .ok_or(ValidationError::MissingDemands)?;
 
                 self.validate_demands()?;
+                self.validate_capacity()?;
 
-                Ok(VRPInstance::new(
+                Ok(VrpInstance::new(
                     self.name,
                     self.problem_type,
                     self.dimension,
@@ -218,14 +307,63 @@ impl VRPInstanceBuilder<u64> {
                     self.capacity,
                     self.demands,
                     self.node_coords,
+                    None,
+                    None,
+                    None,
                 ))
             }
+            ProblemType::Cvrptw => unreachable!("CVRPTW instances use f64"),
         }
     }
 }
 
-impl VRPInstanceBuilder<f64> {
-    pub fn build(self) -> Result<VRPInstance<f64>, ValidationError> {
+impl VrpInstanceBuilder<f64> {
+    fn validate_capacity(&self) -> Result<(), ValidationError> {
+        if self.capacity.is_some_and(|c| c <= 0.0) {
+            return Err(ValidationError::NonPositiveCapacity);
+        }
+        Ok(())
+    }
+
+    fn validate_demand_values(&self) -> Result<(), ValidationError> {
+        if let Some(demands) = &self.demands
+            && demands.iter().any(|&d| d < 0.0)
+        {
+            return Err(ValidationError::NegativeDemand);
+        }
+        Ok(())
+    }
+
+    fn validate_time_windows(&self) -> Result<(), ValidationError> {
+        if let Some(tws) = &self.time_windows {
+            if tws.len() != self.dimension {
+                return Err(ValidationError::InvalidTimeWindowsLength);
+            }
+            for &(ready, due) in tws {
+                if ready < 0.0 || due < 0.0 {
+                    return Err(ValidationError::NegativeTimeWindow);
+                }
+                if ready > due {
+                    return Err(ValidationError::InvalidTimeWindow);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_service_times(&self) -> Result<(), ValidationError> {
+        if let Some(times) = &self.service_times {
+            if times.len() != self.dimension {
+                return Err(ValidationError::InvalidServiceTimesLength);
+            }
+            if times.iter().any(|&t| t < 0.0) {
+                return Err(ValidationError::NegativeServiceTime);
+            }
+        }
+        Ok(())
+    }
+
+    pub fn build(mut self) -> Result<VrpInstance<f64>, ValidationError> {
         let edge_weights = match self.edge_weight_kind {
             EdgeWeightKind::LowerRow => {
                 self.edge_weights
@@ -233,6 +371,10 @@ impl VRPInstanceBuilder<f64> {
                     .ok_or(ValidationError::MissingEdgeWeight)?;
                 expand_lower_row(self.edge_weights.as_ref().unwrap())
             }
+            EdgeWeightKind::FullMatrix => self
+                .edge_weights
+                .take()
+                .ok_or(ValidationError::MissingEdgeWeight)?,
             EdgeWeightKind::Euc2D => self
                 .node_coords
                 .as_ref()
@@ -247,14 +389,29 @@ impl VRPInstanceBuilder<f64> {
                         .collect()
                 })
                 .collect(),
+            EdgeWeightKind::Euc2DExact => self
+                .node_coords
+                .as_ref()
+                .ok_or(ValidationError::MissingNodeCoords)?
+                .iter()
+                .map(|&p| {
+                    self.node_coords
+                        .as_ref()
+                        .unwrap()
+                        .iter()
+                        .map(|&q| euclidean_distance(p, q))
+                        .collect()
+                })
+                .collect(),
         };
 
         if self.depots.is_empty() {
             return Err(ValidationError::MissingDepots);
         }
+        self.validate_depot_indices()?;
 
         match self.problem_type {
-            ProblemType::CVRP => {
+            ProblemType::Cvrp => {
                 self.capacity
                     .as_ref()
                     .ok_or(ValidationError::MissingCapacity)?;
@@ -263,8 +420,10 @@ impl VRPInstanceBuilder<f64> {
                     .ok_or(ValidationError::MissingDemands)?;
 
                 self.validate_demands()?;
+                self.validate_capacity()?;
+                self.validate_demand_values()?;
 
-                Ok(VRPInstance::new(
+                Ok(VrpInstance::new(
                     self.name,
                     self.problem_type,
                     self.dimension,
@@ -273,13 +432,50 @@ impl VRPInstanceBuilder<f64> {
                     self.capacity,
                     self.demands,
                     self.node_coords,
+                    None,
+                    None,
+                    None,
+                ))
+            }
+            ProblemType::Cvrptw => {
+                self.capacity
+                    .as_ref()
+                    .ok_or(ValidationError::MissingCapacity)?;
+                self.demands
+                    .as_ref()
+                    .ok_or(ValidationError::MissingDemands)?;
+                self.time_windows
+                    .as_ref()
+                    .ok_or(ValidationError::MissingTimeWindows)?;
+                self.service_times
+                    .as_ref()
+                    .ok_or(ValidationError::MissingServiceTimes)?;
+
+                self.validate_demands()?;
+                self.validate_capacity()?;
+                self.validate_demand_values()?;
+                self.validate_time_windows()?;
+                self.validate_service_times()?;
+
+                Ok(VrpInstance::new(
+                    self.name,
+                    self.problem_type,
+                    self.dimension,
+                    self.depots,
+                    edge_weights,
+                    self.capacity,
+                    self.demands,
+                    self.node_coords,
+                    self.time_windows,
+                    self.service_times,
+                    self.vehicle_count,
                 ))
             }
         }
     }
 }
 
-impl<T> VRPInstance<T> {
+impl<T> VrpInstance<T> {
     #[allow(clippy::too_many_arguments)]
     fn new(
         name: String,
@@ -290,6 +486,9 @@ impl<T> VRPInstance<T> {
         capacity: Option<T>,
         demands: Option<Vec<T>>,
         node_coords: Option<Vec<(f64, f64)>>,
+        time_windows: Option<Vec<(f64, f64)>>,
+        service_times: Option<Vec<f64>>,
+        vehicle_count: Option<usize>,
     ) -> Self {
         Self {
             name,
@@ -300,6 +499,9 @@ impl<T> VRPInstance<T> {
             capacity,
             demands,
             node_coords,
+            time_windows,
+            service_times,
+            vehicle_count,
         }
     }
 
@@ -337,7 +539,7 @@ impl<T> VRPInstance<T> {
     /// Returns the demand value for each node, if applicable.
     ///
     /// This field is present for problem types that require customer demands,
-    /// such as [`ProblemType::CVRP`]. For other problem types, it is `None`.
+    /// such as [`ProblemType::Cvrp`]. For other problem types, it is `None`.
     pub fn demands(&self) -> &Option<Vec<T>> {
         &self.demands
     }
@@ -350,7 +552,7 @@ impl<T> VRPInstance<T> {
     /// Returns the vehicle capacity, if defined for this instance.
     ///
     /// Capacity is required for capacitated VRP variants such as
-    /// [`ProblemType::CVRP`]. For problem types without capacity constraints,
+    /// [`ProblemType::Cvrp`]. For problem types without capacity constraints,
     /// this field is `None`.
     pub fn capacity(&self) -> &Option<T> {
         &self.capacity
@@ -377,26 +579,61 @@ impl<T> VRPInstance<T> {
     pub fn get_edge_weight(&self, from: usize, to: usize) -> Option<&T> {
         self.edge_weights.get(from)?.get(to)
     }
+
+    /// Returns the time windows `(ready_time, due_date)` for each node, if defined.
+    ///
+    /// Present for [`ProblemType::Cvrptw`] instances (e.g., Solomon format).
+    /// `None` for problem types without time windows.
+    pub fn time_windows(&self) -> &Option<Vec<(f64, f64)>> {
+        &self.time_windows
+    }
+
+    /// Returns the time window for a specific node, or `None` if not defined or out of bounds.
+    pub fn get_time_window(&self, node: usize) -> Option<&(f64, f64)> {
+        self.time_windows.as_ref()?.get(node)
+    }
+
+    /// Returns the service time for each node, if defined.
+    ///
+    /// Present for [`ProblemType::Cvrptw`] instances. `None` otherwise.
+    pub fn service_times(&self) -> &Option<Vec<f64>> {
+        &self.service_times
+    }
+
+    /// Returns the service time for a specific node, or `None` if not defined or out of bounds.
+    pub fn get_service_time(&self, node: usize) -> Option<&f64> {
+        self.service_times.as_ref()?.get(node)
+    }
+
+    /// Returns the number of available vehicles, if specified by the instance format.
+    ///
+    /// Solomon instances include a vehicle count. VRPLib instances do not, so this is `None`.
+    pub fn vehicle_count(&self) -> Option<usize> {
+        self.vehicle_count
+    }
 }
 
 #[cfg(test)]
 mod tests {
 
     use super::*;
-    use crate::vrplib::edge_weight_format::EdgeWeightFormat;
-    use crate::vrplib::edge_weight_type::EdgeWeightType;
-    use crate::vrplib::node_coord_type::NodeCoordType;
+    use crate::vrplib::types::edge_weight_format::EdgeWeightFormat;
+    use crate::vrplib::types::edge_weight_type::EdgeWeightType;
+    use crate::vrplib::types::node_coord_type::NodeCoordType;
 
-    fn build_instance_with_edge_weights() -> VRPInstance<u64> {
-        VRPInstance {
+    fn build_instance_with_edge_weights() -> VrpInstance<u64> {
+        VrpInstance {
             name: "test".to_string(),
-            problem_type: ProblemType::CVRP,
+            problem_type: ProblemType::Cvrp,
             dimension: 3,
             depots: vec![0],
             capacity: None,
             demands: None,
             node_coords: None,
             edge_weights: vec![vec![0, 1, 2], vec![1, 0, 3], vec![2, 3, 0]],
+            time_windows: None,
+            service_times: None,
+            vehicle_count: None,
         }
     }
 
@@ -418,16 +655,19 @@ mod tests {
         assert_eq!(sut.get_edge_weight(0, 99), None);
     }
 
-    fn build_instance_with_coords() -> VRPInstance<u64> {
-        VRPInstance {
+    fn build_instance_with_coords() -> VrpInstance<u64> {
+        VrpInstance {
             name: "test".to_string(),
-            problem_type: ProblemType::CVRP,
+            problem_type: ProblemType::Cvrp,
             dimension: 3,
             depots: vec![0],
             capacity: Some(10),
             demands: Some(vec![0, 5, 8]),
             node_coords: Some(vec![(1.0, 2.0), (3.0, 4.0), (5.0, 6.0)]),
             edge_weights: vec![vec![0, 1, 2], vec![1, 0, 3], vec![2, 3, 0]],
+            time_windows: None,
+            service_times: None,
+            vehicle_count: None,
         }
     }
 
@@ -445,29 +685,35 @@ mod tests {
 
     #[test]
     fn test_get_node_coord_returns_none_when_coords_absent() {
-        let sut = VRPInstance::<u64> {
+        let sut = VrpInstance::<u64> {
             name: "test".to_string(),
-            problem_type: ProblemType::CVRP,
+            problem_type: ProblemType::Cvrp,
             dimension: 3,
             depots: vec![0],
             capacity: None,
             demands: None,
             node_coords: None,
             edge_weights: vec![vec![0, 1, 2], vec![1, 0, 3], vec![2, 3, 0]],
+            time_windows: None,
+            service_times: None,
+            vehicle_count: None,
         };
         assert_eq!(sut.get_node_coord(0), None);
     }
 
-    fn build_instance_with_demands() -> VRPInstance<u64> {
-        VRPInstance {
+    fn build_instance_with_demands() -> VrpInstance<u64> {
+        VrpInstance {
             name: "test".to_string(),
-            problem_type: ProblemType::CVRP,
+            problem_type: ProblemType::Cvrp,
             dimension: 3,
             depots: vec![0],
             capacity: Some(10),
             demands: Some(vec![0, 5, 8]),
             node_coords: None,
             edge_weights: vec![vec![0, 1, 2], vec![1, 0, 3], vec![2, 3, 0]],
+            time_windows: None,
+            service_times: None,
+            vehicle_count: None,
         }
     }
 
@@ -485,15 +731,18 @@ mod tests {
 
     #[test]
     fn test_get_demand_returns_none_when_demands_absent() {
-        let sut = VRPInstance {
+        let sut = VrpInstance {
             name: "test".to_string(),
-            problem_type: ProblemType::CVRP,
+            problem_type: ProblemType::Cvrp,
             dimension: 3,
             depots: vec![0],
             capacity: None,
             demands: None,
             node_coords: None,
             edge_weights: vec![vec![0u64, 1, 2], vec![1, 0, 3], vec![2, 3, 0]],
+            time_windows: None,
+            service_times: None,
+            vehicle_count: None,
         };
         assert_eq!(sut.get_demand(0), None);
     }
@@ -502,7 +751,7 @@ mod tests {
     fn test_make_from_vrplib() {
         let sut = SectionData::<u64> {
             name: Some("This is a name.".to_string()),
-            problem_type: Some(ProblemType::CVRP),
+            problem_type: Some(ProblemType::Cvrp),
             dimension: Some(3),
             edge_weight_type: Some(EdgeWeightType::Explicit),
             edge_weight_format: Some(EdgeWeightFormat::LowerRow),
@@ -510,15 +759,15 @@ mod tests {
             capacity: Some(2),
             edge_weights: vec![vec![4], vec![5, 6]],
             node_coords: vec![vec![0.0, 0.0], vec![7.0, 8.0], vec![9.0, 10.0]],
-            demands: vec![vec![1, 0], vec![2, 11], vec![3, 12]],
-            depots: vec![vec![1]],
+            demands: vec![0, 11, 12],
+            depots: vec![1],
         };
 
-        let value = VRPInstanceBuilder::make_from_vrplib(sut);
+        let value = VrpInstanceBuilder::make_from_vrplib(sut);
 
-        let expected = VRPInstanceBuilder::<u64> {
+        let expected = VrpInstanceBuilder::<u64> {
             name: "This is a name.".to_string(),
-            problem_type: ProblemType::CVRP,
+            problem_type: ProblemType::Cvrp,
             dimension: 3,
             edge_weight_kind: EdgeWeightKind::LowerRow,
             depots: vec![1],
@@ -526,15 +775,18 @@ mod tests {
             demands: Some(vec![0, 11, 12]),
             node_coords: Some(vec![(0.0, 0.0), (7.0, 8.0), (9.0, 10.0)]),
             edge_weights: Some(vec![vec![4], vec![5, 6]]),
+            time_windows: None,
+            service_times: None,
+            vehicle_count: None,
         };
         assert_eq!(value, expected);
     }
 
     #[test]
     fn test_build_succeeds() {
-        let sut = VRPInstanceBuilder::<u64> {
+        let sut = VrpInstanceBuilder::<u64> {
             name: "This is a name.".to_string(),
-            problem_type: ProblemType::CVRP,
+            problem_type: ProblemType::Cvrp,
             dimension: 3,
             edge_weight_kind: EdgeWeightKind::LowerRow,
             depots: vec![1],
@@ -542,28 +794,34 @@ mod tests {
             demands: Some(vec![0, 11, 12]),
             node_coords: Some(vec![(0.0, 0.0), (7.0, 8.0), (9.0, 10.0)]),
             edge_weights: Some(vec![vec![4], vec![5, 6]]),
+            time_windows: None,
+            service_times: None,
+            vehicle_count: None,
         };
 
         let value = sut.build().unwrap();
 
-        let expected = VRPInstance {
+        let expected = VrpInstance {
             name: "This is a name.".to_string(),
-            problem_type: ProblemType::CVRP,
+            problem_type: ProblemType::Cvrp,
             dimension: 3,
             depots: vec![1],
             capacity: Some(2u64),
             demands: Some(vec![0, 11, 12]),
             node_coords: Some(vec![(0.0, 0.0), (7.0, 8.0), (9.0, 10.0)]),
             edge_weights: vec![vec![0, 4, 5], vec![4, 0, 6], vec![5, 6, 0]],
+            time_windows: None,
+            service_times: None,
+            vehicle_count: None,
         };
         assert_eq!(value, expected);
     }
 
     #[test]
     fn test_build_fails_if_missing_depots() {
-        let sut = VRPInstanceBuilder::<u64> {
+        let sut = VrpInstanceBuilder::<u64> {
             name: "This is a name.".to_string(),
-            problem_type: ProblemType::CVRP,
+            problem_type: ProblemType::Cvrp,
             dimension: 3,
             edge_weight_kind: EdgeWeightKind::LowerRow,
             depots: vec![], // is empty
@@ -571,6 +829,9 @@ mod tests {
             demands: Some(vec![0, 11, 12]),
             node_coords: Some(vec![(0.0, 0.0), (7.0, 8.0), (9.0, 10.0)]),
             edge_weights: Some(vec![vec![4], vec![5, 6]]),
+            time_windows: None,
+            service_times: None,
+            vehicle_count: None,
         };
 
         let value = sut.build().unwrap_err();
@@ -581,9 +842,9 @@ mod tests {
 
     #[test]
     fn test_build_fails_if_missing_demands() {
-        let sut = VRPInstanceBuilder::<u64> {
+        let sut = VrpInstanceBuilder::<u64> {
             name: "This is a name.".to_string(),
-            problem_type: ProblemType::CVRP,
+            problem_type: ProblemType::Cvrp,
             dimension: 3,
             edge_weight_kind: EdgeWeightKind::LowerRow,
             depots: vec![1],
@@ -591,6 +852,9 @@ mod tests {
             demands: None, // not given
             node_coords: Some(vec![(0.0, 0.0), (7.0, 8.0), (9.0, 10.0)]),
             edge_weights: Some(vec![vec![4], vec![5, 6]]),
+            time_windows: None,
+            service_times: None,
+            vehicle_count: None,
         };
 
         let value = sut.build().unwrap_err();
@@ -601,9 +865,9 @@ mod tests {
 
     #[test]
     fn test_build_fails_if_missing_capacity() {
-        let sut = VRPInstanceBuilder::<u64> {
+        let sut = VrpInstanceBuilder::<u64> {
             name: "This is a name.".to_string(),
-            problem_type: ProblemType::CVRP,
+            problem_type: ProblemType::Cvrp,
             dimension: 3,
             edge_weight_kind: EdgeWeightKind::LowerRow,
             depots: vec![1],
@@ -611,6 +875,9 @@ mod tests {
             demands: Some(vec![0, 11, 12]),
             node_coords: Some(vec![(0.0, 0.0), (7.0, 8.0), (9.0, 10.0)]),
             edge_weights: Some(vec![vec![4], vec![5, 6]]),
+            time_windows: None,
+            service_times: None,
+            vehicle_count: None,
         };
 
         let value = sut.build().unwrap_err();
@@ -621,9 +888,9 @@ mod tests {
 
     #[test]
     fn test_build_fails_if_missing_edge_weights() {
-        let sut = VRPInstanceBuilder::<u64> {
+        let sut = VrpInstanceBuilder::<u64> {
             name: "This is a name.".to_string(),
-            problem_type: ProblemType::CVRP,
+            problem_type: ProblemType::Cvrp,
             dimension: 3,
             edge_weight_kind: EdgeWeightKind::LowerRow,
             depots: vec![1],
@@ -631,6 +898,9 @@ mod tests {
             demands: Some(vec![0, 11, 12]),
             node_coords: Some(vec![(0.0, 0.0), (7.0, 8.0), (9.0, 10.0)]),
             edge_weights: None, // not given
+            time_windows: None,
+            service_times: None,
+            vehicle_count: None,
         };
 
         let value = sut.build().unwrap_err();
@@ -641,9 +911,9 @@ mod tests {
 
     #[test]
     fn test_build_fails_if_missing_node_coords() {
-        let sut = VRPInstanceBuilder::<u64> {
+        let sut = VrpInstanceBuilder::<u64> {
             name: "This is a name.".to_string(),
-            problem_type: ProblemType::CVRP,
+            problem_type: ProblemType::Cvrp,
             dimension: 3,
             edge_weight_kind: EdgeWeightKind::Euc2D,
             depots: vec![1],
@@ -651,6 +921,9 @@ mod tests {
             demands: Some(vec![0, 11, 12]),
             node_coords: None, // not given
             edge_weights: None,
+            time_windows: None,
+            service_times: None,
+            vehicle_count: None,
         };
 
         let value = sut.build().unwrap_err();
@@ -659,11 +932,162 @@ mod tests {
         assert_eq!(value, expected);
     }
 
+    fn valid_cvrp_u64_builder() -> VrpInstanceBuilder<u64> {
+        VrpInstanceBuilder::<u64> {
+            name: "test".to_string(),
+            problem_type: ProblemType::Cvrp,
+            dimension: 3,
+            edge_weight_kind: EdgeWeightKind::LowerRow,
+            depots: vec![1],
+            capacity: Some(20),
+            demands: Some(vec![0, 11, 12]),
+            node_coords: None,
+            edge_weights: Some(vec![vec![4], vec![5, 6]]),
+            time_windows: None,
+            service_times: None,
+            vehicle_count: None,
+        }
+    }
+
+    fn valid_cvrp_f64_builder() -> VrpInstanceBuilder<f64> {
+        VrpInstanceBuilder::<f64> {
+            name: "test".to_string(),
+            problem_type: ProblemType::Cvrp,
+            dimension: 3,
+            edge_weight_kind: EdgeWeightKind::LowerRow,
+            depots: vec![1],
+            capacity: Some(20.0),
+            demands: Some(vec![0.0, 11.0, 12.0]),
+            node_coords: None,
+            edge_weights: Some(vec![vec![4.0], vec![5.0, 6.0]]),
+            time_windows: None,
+            service_times: None,
+            vehicle_count: None,
+        }
+    }
+
+    fn valid_cvrptw_builder() -> VrpInstanceBuilder<f64> {
+        VrpInstanceBuilder::<f64> {
+            name: "test".to_string(),
+            problem_type: ProblemType::Cvrptw,
+            dimension: 3,
+            edge_weight_kind: EdgeWeightKind::FullMatrix,
+            depots: vec![0],
+            capacity: Some(200.0),
+            demands: Some(vec![0.0, 10.0, 30.0]),
+            node_coords: None,
+            edge_weights: Some(vec![
+                vec![0.0, 10.0, 20.0],
+                vec![10.0, 0.0, 15.0],
+                vec![20.0, 15.0, 0.0],
+            ]),
+            time_windows: Some(vec![(0.0, 1000.0), (100.0, 200.0), (50.0, 150.0)]),
+            service_times: Some(vec![0.0, 10.0, 10.0]),
+            vehicle_count: Some(2),
+        }
+    }
+
+    #[test]
+    fn test_build_fails_if_zero_capacity() {
+        let mut sut = valid_cvrp_u64_builder();
+        sut.capacity = Some(0);
+
+        let value = sut.build().unwrap_err();
+
+        assert_eq!(value, ValidationError::NonPositiveCapacity);
+    }
+
+    #[test]
+    fn test_build_f64_fails_if_non_positive_capacity() {
+        let mut sut = valid_cvrp_f64_builder();
+        sut.capacity = Some(0.0);
+
+        let value = sut.build().unwrap_err();
+
+        assert_eq!(value, ValidationError::NonPositiveCapacity);
+    }
+
+    #[test]
+    fn test_build_f64_fails_if_negative_demand() {
+        let mut sut = valid_cvrp_f64_builder();
+        sut.demands = Some(vec![0.0, -1.0, 12.0]);
+
+        let value = sut.build().unwrap_err();
+
+        assert_eq!(value, ValidationError::NegativeDemand);
+    }
+
+    #[test]
+    fn test_build_fails_if_invalid_depot_index() {
+        let mut sut = valid_cvrp_u64_builder();
+        sut.depots = vec![5]; // index 5 >= dimension 3
+
+        let value = sut.build().unwrap_err();
+
+        assert_eq!(value, ValidationError::InvalidDepotIndex);
+    }
+
+    #[test]
+    fn test_build_f64_cvrptw_succeeds() {
+        let sut = valid_cvrptw_builder();
+        assert!(sut.build().is_ok());
+    }
+
+    #[test]
+    fn test_build_f64_fails_if_invalid_time_windows_length() {
+        let mut sut = valid_cvrptw_builder();
+        sut.time_windows = Some(vec![(0.0, 100.0)]); // wrong length
+
+        let value = sut.build().unwrap_err();
+
+        assert_eq!(value, ValidationError::InvalidTimeWindowsLength);
+    }
+
+    #[test]
+    fn test_build_f64_fails_if_negative_time_window_value() {
+        let mut sut = valid_cvrptw_builder();
+        sut.time_windows = Some(vec![(-1.0, 1000.0), (100.0, 200.0), (50.0, 150.0)]);
+
+        let value = sut.build().unwrap_err();
+
+        assert_eq!(value, ValidationError::NegativeTimeWindow);
+    }
+
+    #[test]
+    fn test_build_f64_fails_if_invalid_time_window_ordering() {
+        let mut sut = valid_cvrptw_builder();
+        sut.time_windows = Some(vec![(0.0, 1000.0), (200.0, 100.0), (50.0, 150.0)]);
+
+        let value = sut.build().unwrap_err();
+
+        assert_eq!(value, ValidationError::InvalidTimeWindow);
+    }
+
+    #[test]
+    fn test_build_f64_fails_if_invalid_service_times_length() {
+        let mut sut = valid_cvrptw_builder();
+        sut.service_times = Some(vec![0.0]); // wrong length
+
+        let value = sut.build().unwrap_err();
+
+        assert_eq!(value, ValidationError::InvalidServiceTimesLength);
+    }
+
+    #[test]
+    fn test_build_f64_fails_if_negative_service_time() {
+        let mut sut = valid_cvrptw_builder();
+        sut.service_times = Some(vec![0.0, -1.0, 10.0]);
+
+        let value = sut.build().unwrap_err();
+
+        assert_eq!(value, ValidationError::NegativeServiceTime);
+    }
+
     #[test]
     fn test_build_f64_succeeds() {
-        let sut = VRPInstanceBuilder::<f64> {
+        let sut = VrpInstanceBuilder::<f64> {
             name: "This is a name.".to_string(),
-            problem_type: ProblemType::CVRP,
+            problem_type: ProblemType::Cvrp,
             dimension: 3,
             edge_weight_kind: EdgeWeightKind::LowerRow,
             depots: vec![1],
@@ -671,13 +1095,16 @@ mod tests {
             demands: Some(vec![0.0, 11.0, 12.0]),
             node_coords: Some(vec![(0.0, 0.0), (7.0, 8.0), (9.0, 10.0)]),
             edge_weights: Some(vec![vec![4.0], vec![5.0, 6.0]]),
+            time_windows: None,
+            service_times: None,
+            vehicle_count: None,
         };
 
         let value = sut.build().unwrap();
 
-        let expected = VRPInstance {
+        let expected = VrpInstance {
             name: "This is a name.".to_string(),
-            problem_type: ProblemType::CVRP,
+            problem_type: ProblemType::Cvrp,
             dimension: 3,
             depots: vec![1],
             capacity: Some(2.0f64),
@@ -688,6 +1115,9 @@ mod tests {
                 vec![4.0, 0.0, 6.0],
                 vec![5.0, 6.0, 0.0],
             ],
+            time_windows: None,
+            service_times: None,
+            vehicle_count: None,
         };
         assert_eq!(value, expected);
     }

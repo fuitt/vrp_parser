@@ -1,25 +1,33 @@
 //! # vrplib
 //!
-//! A library for loading VRPLib-formatted files and representing them as VRP instances.
+//! A library for loading VRP instance files and representing them as VRP instances.
 //!
-//! ## Features
-//! - Loading VRPLib files
-//! - Lexical and syntactic parsing
-//! - Instance validation
+//! ## Supported formats
+//! - **VRPLib**: use [`read_from_vrplib`] (integer weights) or [`read_from_vrplib_f64`]
+//!   (floating-point weights)
+//! - **Solomon**: use [`read_from_solomon_f64`] for CVRPTW instances
 //!
-//! ## Example
+//! ## Examples
 //! ```no_run
+//! // VRPLib (CVRP)
 //! let instance = vrp_parser::read_from_vrplib("example.vrp").unwrap();
+//!
+//! // Solomon (CVRPTW)
+//! let instance = vrp_parser::read_from_solomon_f64("example.txt").unwrap();
 //! ```
-pub(crate) mod common;
+pub(crate) mod error;
 pub(crate) mod instance;
+pub(crate) mod model;
+pub(crate) mod solomon;
+pub(crate) mod util;
 pub(crate) mod vrplib;
 
-pub(crate) use common::EdgeWeightKind;
-pub(crate) use common::Numeric;
-pub use common::ProblemType;
-pub use instance::VRPInstance;
-pub(crate) use instance::VRPInstanceBuilder;
-pub use vrplib::reader::LoadError;
+pub use error::LoadError;
+pub use instance::VrpInstance;
+pub(crate) use instance::VrpInstanceBuilder;
+pub(crate) use model::EdgeWeightKind;
+pub use model::ProblemType;
+pub use solomon::reader::read_from_solomon_f64;
+pub(crate) use util::Numeric;
 pub use vrplib::reader::read_from_vrplib;
 pub use vrplib::reader::read_from_vrplib_f64;

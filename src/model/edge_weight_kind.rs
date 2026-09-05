@@ -1,5 +1,5 @@
-use crate::vrplib::edge_weight_format::EdgeWeightFormat;
-use crate::vrplib::edge_weight_type::EdgeWeightType;
+use crate::vrplib::types::edge_weight_format::EdgeWeightFormat;
+use crate::vrplib::types::edge_weight_type::EdgeWeightType;
 
 /// Represents the unified edge‑weight representation used by this library.
 ///
@@ -15,18 +15,23 @@ use crate::vrplib::edge_weight_type::EdgeWeightType;
 /// into a single representation used internally by this library, allowing the
 /// loader and instance builder to treat all supported formats consistently.
 ///
-/// Currently, only the `LowerRow` and `Euc2D` format is supported.
-///
 /// - `LowerRow`: The lower triangular part of a symmetric matrix is listed
-///   row by row, excluding the diagonal. This corresponds to VRPLib’s
+///   row by row, excluding the diagonal. This corresponds to VRPLib's
 ///   `EDGE_WEIGHT_FORMAT = LOWER_ROW` when used with `EDGE_WEIGHT_TYPE = EXPLICIT`.
-/// - `Euc2D`: The edge weights are computed as the Euclidean distance between
-///   2D coordinates. This corresponds to VRPLib’s `EDGE_WEIGHT_TYPE = EUC_2D` with no
-///   `EDGE_WEIGHT_FORMAT`.
-#[derive(Clone, Copy, Debug, PartialEq)]
+/// - `FullMatrix`: A complete n×n matrix is stored explicitly. This corresponds
+///   to VRPLib's `EDGE_WEIGHT_FORMAT = FULL_MATRIX` when used with
+///   `EDGE_WEIGHT_TYPE = EXPLICIT`.
+/// - `Euc2D`: Edge weights are computed as the nearest-integer Euclidean
+///   distance between 2D coordinates. This corresponds to VRPLib's
+///   `EDGE_WEIGHT_TYPE = EUC_2D`.
+/// - `Euc2DExact`: Edge weights are computed as the exact (non-rounded)
+///   Euclidean distance between 2D coordinates. Used for Solomon instances.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum EdgeWeightKind {
     LowerRow,
+    FullMatrix,
     Euc2D,
+    Euc2DExact,
 }
 
 impl EdgeWeightKind {
@@ -39,6 +44,7 @@ impl EdgeWeightKind {
                 if let Some(fmt) = edge_weight_format {
                     match fmt {
                         EdgeWeightFormat::LowerRow => return Some(EdgeWeightKind::LowerRow),
+                        EdgeWeightFormat::FullMatrix => return Some(EdgeWeightKind::FullMatrix),
                     }
                 }
             }
